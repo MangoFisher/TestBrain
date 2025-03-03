@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Test Brain - 知识库管理{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        添加知识条目
+    </div>
+    <div class="card-body">
+        <form id="add-knowledge-form">
+            <div class="form-group">
+                <label for="knowledge-title">标题:</label>
+                <input type="text" id="knowledge-title" name="title" class="form-control" required data-error-message="请输入知识条目标题">
+            </div>
+            
+            <div class="form-group">
+                <label for="knowledge-content">内容:</label>
+                <textarea id="knowledge-content" name="content" class="form-control" rows="10" required data-error-message="请输入知识条目内容"></textarea>
+            </div>
+            
+            <div class="text-right">
+                <button type="submit" class="btn btn-primary">添加知识条目</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header">
+        知识库列表
+    </div>
+    <div class="card-body">
+        <div class="form-group">
+            <input type="text" id="knowledge-search" class="form-control" placeholder="搜索知识库...">
+        </div>
+        
+        <div id="knowledge-list">
+            <div class="text-center">
+                <div class="spinner"></div>
+                <p>加载知识库...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 搜索功能
+        const searchInput = document.getElementById('knowledge-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const knowledgeItems = document.querySelectorAll('.list-group-item');
+                
+                knowledgeItems.forEach(item => {
+                    const title = item.querySelector('h5').textContent.toLowerCase();
+                    const content = item.querySelector('p').textContent.toLowerCase();
+                    
+                    if (title.includes(searchTerm) || content.includes(searchTerm)) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %} 

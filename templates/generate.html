@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Test Brain - 测试用例生成{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        测试用例生成
+    </div>
+    <div class="card-body">
+        <form method="post" action="{% url 'generate' %}">
+            {% csrf_token %}
+            
+            <div class="form-group mb-3">
+                <label for="llm-provider">选择大模型:</label>
+                <select class="form-control" id="llm-provider" name="llm_provider">
+                    {% for provider_key, provider_config in llm_providers.items %}
+                        <option value="{{ provider_key }}" {% if llm_provider == provider_key %}selected{% endif %}>
+                            {{ provider_config.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label id="input-text-label" for="input-text">需求描述:</label>
+                <textarea id="input-text" name="requirement" class="form-control" rows="10" required>{{ requirement }}</textarea>
+            </div>      
+            <div class="text-right">
+                <button type="submit" id="generate-button" class="btn btn-primary">生成测试用例</button>
+            </div>
+        </form>
+        
+        <div id="loading-indicator" style="display: none;" class="text-center mt-3">
+            <div class="spinner"></div>
+            <p>正在生成测试用例，请稍候...</p>
+        </div>
+    </div>
+</div>
+
+{% if test_cases %}
+<div id="result-container" class="mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">生成的测试用例</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="thead-light">
+                        <tr>
+                            <th width="5%">编号</th>
+                            <th width="25%">测试用例描述</th>
+                            <th width="35%">测试步骤</th>
+                            <th width="35%">预期结果</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if test_cases_json %}
+                            {% with test_cases_data=test_cases_json|safe|json_script:"test-cases-data" %}
+                                <script id="test-cases-data" type="application/json">{{ test_cases_json|safe }}</script>
+                                <script>
+                                    document.addEventListener('DOMContentLoaded', function() {
+                                        const testCasesData = JSON.parse(document.getElementById('test-cases-data').textContent);
+                                        const tbody = document.querySelector('#result-container table tbody');
+                                        
+                                        // 清空表格
+                                        tbody.innerHTML = '';
+                                        
+                                        // 填充表格
+                                        testCasesData.forEach((testCase, index) => {
+                                            const row = document.createElement('tr');
+                                            
+                                            // 编号列
+                                            const numCell = document.createElement('td');
+                                            numCell.textContent = index + 1;
+                                            row.appendChild(numCell);
+                                            
+                                            // 描述列
+                                            const descCell = document.createElement('td');
+                                            descCell.textContent = testCase.description;
+                                            row.appendChild(descCell);
+                                            
+                                            // 测试步骤列
+                                            const stepsCell = document.createElement('td');
+                                            const stepsDiv = document.createElement('div');
+                                            testCase.test_steps.forEach(step => {
+                                                const stepDiv = document.createElement('div');
+                                                stepDiv.className = 'mb-2';
+                                                stepDiv.textContent = step;
+                                                stepsDiv.appendChild(stepDiv);
+                                            });
+                                            stepsCell.appendChild(stepsDiv);
+                                            row.appendChild(stepsCell);
+                                            
+                                            // 预期结果列
+                                            const resultsCell = document.createElement('td');
+                                            const resultsDiv = document.createElement('div');
+                                            testCase.expected_results.forEach(result => {
+                                                const resultDiv = document.createElement('div');
+                                                resultDiv.className = 'mb-2';
+                                                resultDiv.textContent = result;
+                                                resultsDiv.appendChild(resultDiv);
+                                            });
+                                            resultsCell.appendChild(resultsDiv);
+                                            row.appendChild(resultsCell);
+                                            
+                                            tbody.appendChild(row);
+                                        });
+                                    });
+                                </script>
+                            {% endwith %}
+                        {% else %}
+                            <tr>
+                                <td colspan="4">{{ test_cases|safe }}</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="text-right mt-3" id="save-container">
+    <button id="save-button" class="btn btn-success">保存测试用例</button>
+</div>
+{% endif %}
+
+<script>
+    // 保存用户选择的大模型到本地存储
+    document.getElementById('llm-provider').addEventListener('change', function() {
+        localStorage.setItem('preferred-llm-provider', this.value);
+    });
+    
+    // 页面加载时恢复用户之前的选择（如果后端没有指定值）
+    document.addEventListener('DOMContentLoaded', function() {
+        const providerSelect = document.getElementById('llm-provider');
+        // 只有当没有后端选择值时才从本地存储加载
+        if (!providerSelect.options[providerSelect.selectedIndex].hasAttribute('selected')) {
+            const savedProvider = localStorage.getItem('preferred-llm-provider');
+            if (savedProvider) {
+                // 确保保存的值在当前选项中存在
+                for (let i = 0; i < providerSelect.options.length; i++) {
+                    if (providerSelect.options[i].value === savedProvider) {
+                        providerSelect.value = savedProvider;
+                        break;
+                    }
+                }
+            }
+        }
+    });
+    
+    // 表单提交时显示加载指示器
+    document.querySelector('form').addEventListener('submit', function() {
+        document.getElementById('loading-indicator').style.display = 'block';
+        document.getElementById('generate-button').disabled = true;
+    });
+    
+    // 保存测试用例按钮点击事件
+    document.getElementById('save-button')?.addEventListener('click', function() {
+        // 这里可以添加保存测试用例的逻辑
+        alert('保存测试用例功能尚未实现');
+    });
+</script>
+{% endblock %} 

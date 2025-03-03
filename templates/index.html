@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Test Brain - 首页{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        欢迎使用 Test Brain 测试用例管理平台
+    </div>
+    <div class="card-body">
+        <h2>平台功能</h2>
+        <p>Test Brain 是一个智能测试用例管理平台，集成了大模型能力，可以帮助您：</p>
+        
+        <div class="mt-3">
+            <h4>1. 自动生成测试用例</h4>
+            <p>基于需求描述或代码片段，自动生成全面的测试用例，提高测试覆盖率。</p>
+            <a href="/generate/" class="btn btn-primary">开始生成测试用例</a>
+        </div>
+        
+        <div class="mt-3">
+            <h4>2. 智能评审测试用例</h4>
+            <p>对生成的测试用例进行智能评审，查缺补漏，确保测试质量。</p>
+            <a href="/review/" class="btn btn-primary">开始评审测试用例</a>
+        </div>
+        
+        <div class="mt-3">
+            <h4>3. 管理知识库</h4>
+            <p>维护测试领域知识库，提升测试用例生成和评审的质量。</p>
+            <a href="/knowledge/" class="btn btn-primary">管理知识库</a>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header">
+        测试用例统计
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h3>{{ total_test_cases }}</h3>
+                        <p>总测试用例数</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h3>{{ pending_review_count }}</h3>
+                        <p>待评审</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h3>{{ approved_count }}</h3>
+                        <p>评审通过</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h3>{{ rejected_count }}</h3>
+                        <p>评审未通过</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header">
+        最近生成的测试用例
+    </div>
+    <div class="card-body">
+        {% if recent_test_cases %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>标题</th>
+                        <th>创建时间</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for test_case in recent_test_cases %}
+                    <tr>
+                        <td>{{ test_case.title }}</td>
+                        <td>{{ test_case.created_at }}</td>
+                        <td>
+                            {% if test_case.status == 'pending_review' %}
+                                <span class="badge badge-warning">待评审</span>
+                            {% elif test_case.status == 'approved' %}
+                                <span class="badge badge-success">评审通过</span>
+                            {% elif test_case.status == 'rejected' %}
+                                <span class="badge badge-danger">评审未通过</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="/test-case/{{ test_case.id }}/" class="btn btn-sm btn-primary">查看</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>暂无测试用例</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 
