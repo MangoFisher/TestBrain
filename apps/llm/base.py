@@ -5,6 +5,10 @@ import time
 from dotenv import load_dotenv
 from utils.logger_manager import get_logger
 from django.conf import settings
+from langchain.chat_models.base import BaseChatModel
+from .callbacks import LoggingCallbackHandler
+from .deepseek import DeepSeekChatModel
+from .qwen import QwenChatModel
 
 
 # 加载.env文件中的环境变量
@@ -57,20 +61,17 @@ class BaseLLMService(ABC):
         self.logger.error(f"调用失败 {method_name}: 耗时={elapsed_time:.2f}秒, 错误={str(error)}", exc_info=True)
 
 class LLMServiceFactory:
-    """大模型服务工厂，用于创建不同的LLM服务实例"""
+    """大模型服务工厂"""
     
     @staticmethod
-    def create(provider: str, **config) -> BaseLLMService:
+    def create(provider: str, **config) -> BaseChatModel:
+        """创建LLM服务实例"""
         logger = get_logger('llm')
         logger.info(f"创建LLM服务: provider={provider}")
         
         # 获取LLM配置
         llm_config = getattr(settings, 'LLM_PROVIDERS', {})
-        
-        # 获取默认提供商
         default_provider = llm_config.get('default_provider', 'deepseek')
-        
-        # 创建提供商字典，排除'default_provider'键
         providers = {k: v for k, v in llm_config.items() if k != 'default_provider'}
         
         # 检查提供商是否存在
@@ -81,28 +82,32 @@ class LLMServiceFactory:
         # 获取提供商配置
         provider_config = providers.get(provider, {})
         
-        # 合并配置，命令行参数优先级高于settings配置
-        merged_config = {**provider_config, **config}
+        # 获取API密钥
+        api_key = config.get('api_key') or os.getenv(f"{provider.upper()}_API_KEY")
+        if api_key:
+            provider_config['api_key'] = api_key
         
-        # 如果没有提供API密钥，尝试从环境变量获取
-        if "api_key" not in merged_config:
-            env_key = f"{provider.upper()}_API_KEY"
-            merged_config["api_key"] = os.getenv(env_key)
-            if merged_config["api_key"]:
-                logger.info(f"从环境变量加载{env_key}")
-            else:
-                logger.warning(f"未找到{env_key}环境变量")
+        # 创建回调处理器
+        callbacks = [LoggingCallbackHandler()]
+        
+        # 合并配置
+        merged_config = {
+            **provider_config,
+            **config,
+            'callbacks': callbacks,
+            'verbose': True  # 启用详细日志
+        }
         
         # 根据提供商创建相应的服务实例
         if provider.lower() == "deepseek":
-            from .deepseek import DeepSeekLLMService
-            return DeepSeekLLMService(**merged_config)
+            from .deepseek import DeepSeekChatModel
+            return DeepSeekChatModel(**merged_config)
         elif provider.lower() == "qwen":
-            from .qwen import QwenLLMService
-            return QwenLLMService(**merged_config)
-        elif provider.lower() == "langchain":
-            from .langchain_adapter import LangChainAdapter
-            return LangChainAdapter(**merged_config)
+            from .qwen import QwenChatModel
+            return QwenChatModel(**merged_config)
+        elif provider.lower() == "openai":
+            from langchain_community.chat_models import ChatOpenAI
+            return ChatOpenAI(**merged_config)
         else:
             logger.error(f"未实现的LLM提供商: {provider}")
             raise NotImplementedError(f"LLM provider {provider} is not implemented") 

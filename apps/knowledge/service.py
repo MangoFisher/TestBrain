@@ -2,6 +2,7 @@ from .vector_store import MilvusVectorStore
 from .embedding import BGEM3Embedder
 from ..core.models import KnowledgeBase
 from typing import List, Dict, Any
+from utils.logger_manager import get_logger
 
 class KnowledgeService:
     """知识库服务，整合向量存储和嵌入模型"""
@@ -9,6 +10,7 @@ class KnowledgeService:
     def __init__(self, vector_store: MilvusVectorStore, embedder: BGEM3Embedder):
         self.vector_store = vector_store
         self.embedder = embedder
+        self.logger = get_logger('knowledge')
         
     def add_knowledge(self, title: str, content: str) -> int:
         """添加知识到知识库"""
@@ -40,3 +42,17 @@ class KnowledgeService:
         results = self.vector_store.search(query_embedding, top_k=top_k)
         
         return results 
+
+    def search_relevant_knowledge(self, query: str) -> str:
+        """
+        搜索相关知识
+        
+        Args:
+            query: 查询文本
+            
+        Returns:
+            str: 相关知识文本，如果没有找到则返回空字符串
+        """
+        # TODO: 实现知识搜索逻辑
+        self.logger.info(f"搜索知识: {query}")
+        return ""  # 暂时返回空字符串，后续实现具体搜索逻辑 

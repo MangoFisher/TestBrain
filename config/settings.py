@@ -113,22 +113,29 @@ STATICFILES_DIRS = [
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# 大模型配置
+# LLM提供商配置
 LLM_PROVIDERS = {
-    # 默认大模型提供商
     'default_provider': 'deepseek',
     'deepseek': {
         'name': 'DeepSeek',
-        'default': True,
-        'api_url': 'https://api.deepseek.com/v1/chat/completions',
         'model': 'deepseek-chat',
+        'api_base': 'https://api.deepseek.com/v1',
+        'temperature': 0.7,
+        'max_tokens': 2000,
     },
     'qwen': {
         'name': '通义千问',
-        'default': False,
-        'api_url': 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
         'model': 'qwen-max',
+        'api_base': 'https://dashscope.aliyuncs.com/api/v1',
+        'temperature': 0.7,
+        'max_tokens': 2000,
     },
+    'openai': {
+        'name': 'OpenAI',
+        'model': 'gpt-3.5-turbo',
+        'temperature': 0.7,
+        'max_tokens': 2000,
+    }
 }
 
 # # 默认大模型提供商
