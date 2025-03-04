@@ -9,7 +9,7 @@ urlpatterns = [
     
     # API路由
     path('api/generate/', views.generate_api, name='generate_api'),
-    path('api/save-test-case/', views.save_test_case, name='save_test_case'),
+    path('core/save-test-case/', views.save_test_case, name='save_test_case'),
     path('api/review/', views.review_api, name='review_api'),
     path('api/update-status/', views.update_test_case_status, name='update_status'),
     path('api/add-knowledge/', views.add_knowledge, name='add_knowledge'),

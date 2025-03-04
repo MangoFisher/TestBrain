@@ -56,71 +56,31 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% if test_cases_json %}
-                            {% with test_cases_data=test_cases_json|safe|json_script:"test-cases-data" %}
-                                <script id="test-cases-data" type="application/json">{{ test_cases_json|safe }}</script>
-                                <script>
-                                    document.addEventListener('DOMContentLoaded', function() {
-                                        const testCasesData = JSON.parse(document.getElementById('test-cases-data').textContent);
-                                        const tbody = document.querySelector('#result-container table tbody');
-                                        
-                                        // 清空表格
-                                        tbody.innerHTML = '';
-                                        
-                                        // 填充表格
-                                        testCasesData.forEach((testCase, index) => {
-                                            const row = document.createElement('tr');
-                                            
-                                            // 编号列
-                                            const numCell = document.createElement('td');
-                                            numCell.textContent = index + 1;
-                                            row.appendChild(numCell);
-                                            
-                                            // 描述列
-                                            const descCell = document.createElement('td');
-                                            descCell.textContent = testCase.description;
-                                            row.appendChild(descCell);
-                                            
-                                            // 测试步骤列
-                                            const stepsCell = document.createElement('td');
-                                            const stepsDiv = document.createElement('div');
-                                            testCase.test_steps.forEach(step => {
-                                                const stepDiv = document.createElement('div');
-                                                stepDiv.className = 'mb-2';
-                                                stepDiv.textContent = step;
-                                                stepsDiv.appendChild(stepDiv);
-                                            });
-                                            stepsCell.appendChild(stepsDiv);
-                                            row.appendChild(stepsCell);
-                                            
-                                            // 预期结果列
-                                            const resultsCell = document.createElement('td');
-                                            const resultsDiv = document.createElement('div');
-                                            testCase.expected_results.forEach(result => {
-                                                const resultDiv = document.createElement('div');
-                                                resultDiv.className = 'mb-2';
-                                                resultDiv.textContent = result;
-                                                resultsDiv.appendChild(resultDiv);
-                                            });
-                                            resultsCell.appendChild(resultsDiv);
-                                            row.appendChild(resultsCell);
-                                            
-                                            tbody.appendChild(row);
-                                        });
-                                    });
-                                </script>
-                            {% endwith %}
-                        {% else %}
+                        {% for test_case in test_cases %}
                             <tr>
-                                <td colspan="4">{{ test_cases|safe }}</td>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ test_case.description }}</td>
+                                <td>
+                                    {% for step in test_case.test_steps %}
+                                        <div class="mb-2">{{ step }}</div>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {% for result in test_case.expected_results %}
+                                        <div class="mb-2">{{ result }}</div>
+                                    {% endfor %}
+                                </td>
                             </tr>
-                        {% endif %}
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 </div>
+
+{# 修改 JSON 数据的存储方式 #}
+{{ test_cases|json_script:"test-cases-data" }}
 
 <div class="text-right mt-3" id="save-container">
     <button id="save-button" class="btn btn-success">保存测试用例</button>
@@ -157,10 +117,87 @@
         document.getElementById('generate-button').disabled = true;
     });
     
-    // 保存测试用例按钮点击事件
-    document.getElementById('save-button')?.addEventListener('click', function() {
-        // 这里可以添加保存测试用例的逻辑
-        alert('保存测试用例功能尚未实现');
+    document.addEventListener('DOMContentLoaded', function() {
+        const saveButton = document.getElementById('save-button');
+        if (!saveButton) {
+            console.error('找不到保存按钮元素');
+            return;
+        }
+
+        saveButton.addEventListener('click', function() {
+            console.log('保存按钮被点击'); // 调试日志
+            
+            // 获取页面上的数据
+            const requirementElement = document.getElementById('input-text');
+            const testCasesScript = document.getElementById('test-cases-data');
+            const llmProviderElement = document.getElementById('llm-provider');
+            
+            // 检查元素是否存在并分别记录
+            if (!requirementElement) {
+                console.error('缺失需求描述元素 (input-text)');
+            }
+            if (!testCasesScript) {
+                console.error('缺失测试用例数据元素 (test-cases-data)');
+            }
+            if (!llmProviderElement) {
+                console.error('缺失LLM提供商选择元素 (llm-provider)');
+            }
+            
+            if (!requirementElement || !testCasesScript || !llmProviderElement) {
+                alert('页面元素缺失，无法保存数据。请查看控制台获取详细信息。');
+                return;
+            }
+
+            try {
+                // 从script标签中获取JSON数据
+                const testCasesData = JSON.parse(testCasesScript.textContent);
+                
+                // 发送保存请求
+                fetch('/core/save-test-case/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        requirement: requirementElement.value,
+                        test_cases: testCasesData,
+                        llm_provider: llmProviderElement.value
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('测试用例保存成功！');
+                    } else {
+                        alert('保存失败：' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('保存失败:', error);
+                    alert('保存失败，请查看控制台获取详细信息');
+                });
+            } catch (error) {
+                console.error('解析测试用例数据失败:', error);
+                alert('解析测试用例数据失败，请查看控制台获取详细信息');
+            }
+        });
     });
+
+    // 获取CSRF Token的辅助函数
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
 </script>
 {% endblock %} 

@@ -126,7 +126,7 @@ LLM_PROVIDERS = {
     'qwen': {
         'name': '通义千问',
         'model': 'qwen-max',
-        'api_base': 'https://dashscope.aliyuncs.com/api/v1',
+        'api_base': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         'temperature': 0.7,
         'max_tokens': 2000,
     },

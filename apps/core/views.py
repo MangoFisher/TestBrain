@@ -83,7 +83,7 @@ def generate(request):
         'llm_provider': DEFAULT_PROVIDER,
         'requirement': '',
         # 'api_description': '',
-        'test_cases': ''
+        'test_cases': None  # 初始化为 None
     }
     
     if request.method == 'POST':
@@ -99,18 +99,17 @@ def generate(request):
                 # 创建知识服务和测试用例生成Agent
                 # knowledge_service = KnowledgeService()
                 generator_agent = TestCaseGeneratorAgent(llm_service, knowledge_service)
-                
+                logger.info(f"开始生成测试用例 - 需求: {requirement}...")
                 # 生成测试用例
                 test_cases = generator_agent.generate(requirement, input_type="requirement")
+                logger.info(f"测试用例生成成功 - 生成数量: {len(test_cases)}")
+                logger.info(f"测试用例数据结构: {type(test_cases)}")
+                logger.info(f"测试用例详细内容: {json.dumps(test_cases, ensure_ascii=False, indent=2)}")
                 
-                # 格式化测试用例为HTML
-                test_cases_html = format_test_cases_to_html(test_cases)
-                
-                # 更新上下文
+                # 直接将测试用例数据传递给模板
                 context.update({
                     'requirement': requirement,
-                    'test_cases': test_cases_html,
-                    'test_cases_json': json.dumps(test_cases),
+                    'test_cases': test_cases,  # 直接传递测试用例数据
                     'llm_provider': llm_provider
                 })
                 
@@ -183,39 +182,58 @@ def save_test_case(request):
     """保存测试用例"""
     try:
         data = json.loads(request.body)
-        test_cases = data.get('test_cases', [])
-        requirements = data.get('requirements', '')
-        code_snippet = data.get('code_snippet', '')
+        requirement = data.get('requirement')
+        test_cases_list = data.get('test_cases', [])
+        llm_provider = data.get('llm_provider')
         
-        saved_test_cases = []
+        logger.info(f"接收到的保存请求数据: {json.dumps(data, ensure_ascii=False, indent=2)}")
         
-        for tc in test_cases:
-            test_case = TestCase(
-                title=tc.get('title', ''),
-                description=tc.get('description', ''),
-                requirements=requirements,
-                code_snippet=code_snippet,
-                test_steps=tc.get('test_steps', ''),
-                expected_results=tc.get('expected_results', ''),
-                status='pending_review',
-                created_by=request.user
+        if not test_cases_list:
+            return JsonResponse({
+                'success': False,
+                'message': '测试用例数据为空'
+            }, status=400)
+        
+        # 准备批量创建的测试用例列表
+        test_cases_to_create = []
+        
+        # 遍历测试用例数据，创建TestCase实例
+        for index, test_case in enumerate(test_cases_list, 1):
+            test_case_instance = TestCase(
+                title=f"测试用例-{index}",  # 可以根据需求调整标题格式
+                description=test_case.get('description', ''),
+                test_steps='\n'.join(test_case.get('test_steps', [])),
+                expected_results='\n'.join(test_case.get('expected_results', [])),
+                requirements=requirement,
+                llm_provider=llm_provider,
+                status='pending_review'  # 默认状态为待评审
+                # created_by=request.user  # 如果需要记录创建用户，取消注释此行
             )
-            test_case.save()
-            saved_test_cases.append({
-                'id': test_case.id,
-                'title': test_case.title
-            })
+            test_cases_to_create.append(test_case_instance)
+        
+        # 批量创建测试用例
+        created_test_cases = TestCase.objects.bulk_create(test_cases_to_create)
+        
+        logger.info(f"成功保存 {len(created_test_cases)} 条测试用例")
         
         return JsonResponse({
             'success': True,
-            'message': f'成功保存 {len(saved_test_cases)} 个测试用例',
-            'test_cases': saved_test_cases
+            'message': f'成功保存 {len(created_test_cases)} 条测试用例',
+            'test_case_ids': [case.id for case in created_test_cases]
         })
-    except Exception as e:
+        
+    except json.JSONDecodeError:
+        logger.error("JSON解析错误", exc_info=True)
         return JsonResponse({
             'success': False,
-            'message': str(e)
-        })
+            'message': '无效的JSON数据'
+        }, status=400)
+    except Exception as e:
+        logger.error(f"保存测试用例时出错: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'message': f'保存失败：{str(e)}'
+        }, status=500)
 
 # @login_required 先屏蔽登录
 def review_view(request):

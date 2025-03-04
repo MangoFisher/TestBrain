@@ -26,10 +26,14 @@ class TestCase(models.Model):
         User, 
         on_delete=models.CASCADE, 
         related_name='created_testcases',
-        verbose_name="创建者"
+        verbose_name="创建者",
+        null=True,
+        blank=True
     )
+
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+    llm_provider = models.CharField(max_length=50, null=True, blank=True)
     
     def __str__(self):
         return self.title
