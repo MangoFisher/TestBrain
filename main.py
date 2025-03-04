@@ -1,16 +1,11 @@
-# This is a sample Python script.
+import os
+import sys
+from django.core.management import execute_from_command_line
 
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
-
-
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+if __name__ == "__main__":
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+    try:
+        execute_from_command_line(["manage.py", "runserver"])
+    except Exception as e:
+        print(f"启动服务器时出错: {str(e)}")
+        sys.exit(1)
