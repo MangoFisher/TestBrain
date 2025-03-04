@@ -1,7 +1,7 @@
 from typing import Dict, Any, List, Optional
 import json
-from langchain.schema import SystemMessage, HumanMessage
-from ..llm.base import BaseChatModel
+from langchain_core.messages import SystemMessage, HumanMessage
+from ..llm.base import BaseLLMService
 from ..knowledge.service import KnowledgeService
 from .prompts import TestCaseGeneratorPrompt
 from utils.logger_manager import get_logger
@@ -9,7 +9,7 @@ from utils.logger_manager import get_logger
 class TestCaseGeneratorAgent:
     """测试用例生成Agent"""
     
-    def __init__(self, llm_service: BaseChatModel, knowledge_service: KnowledgeService):
+    def __init__(self, llm_service: BaseLLMService, knowledge_service: KnowledgeService):
         self.llm_service = llm_service
         self.knowledge_service = knowledge_service
         self.prompt = TestCaseGeneratorPrompt()
@@ -35,7 +35,7 @@ class TestCaseGeneratorAgent:
         
         # 调用LLM服务
         try:
-            response = self.llm_service(messages)
+            response = self.llm_service.invoke(messages)
             result = response.content
             
             # 解析JSON结果
@@ -84,3 +84,23 @@ class TestCaseGeneratorAgent:
                     f"测试用例 #{i+1} 的测试步骤数量 ({len(test_case['test_steps'])}) "
                     f"与预期结果数量 ({len(test_case['expected_results'])}) 不一致"
                 )
+
+class Generator:
+    def __init__(self, llm_service: BaseLLMService):
+        self.llm_service = llm_service
+    
+    def generate(self, prompt: str, system_prompt: str = None) -> str:
+        """生成响应"""
+        messages = []
+        
+        if system_prompt:
+            messages.append(SystemMessage(content=system_prompt))
+        
+        messages.append(HumanMessage(content=prompt))
+        
+        try:
+            response = self.llm_service.invoke(messages)
+            return response.content
+        except Exception as e:
+            # 错误处理
+            raise

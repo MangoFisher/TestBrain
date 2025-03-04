@@ -5,7 +5,9 @@ import time
 from dotenv import load_dotenv
 from utils.logger_manager import get_logger
 from django.conf import settings
-from langchain.chat_models.base import BaseChatModel
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import BaseMessage
+from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from .callbacks import LoggingCallbackHandler
 from .deepseek import DeepSeekChatModel
 from .qwen import QwenChatModel
@@ -14,8 +16,8 @@ from .qwen import QwenChatModel
 # 加载.env文件中的环境变量
 load_dotenv()
 
-class BaseLLMService(ABC):
-    """大模型服务的基类，提供统一接口"""
+class BaseLLMService(BaseChatModel):
+    """基础LLM服务类"""
     
     def __init__(self):
         # 使用统一日志管理器获取日志记录器
@@ -59,6 +61,21 @@ class BaseLLMService(ABC):
     def _log_error(self, method_name: str, error: Exception, elapsed_time: float):
         """记录错误日志"""
         self.logger.error(f"调用失败 {method_name}: 耗时={elapsed_time:.2f}秒, 错误={str(error)}", exc_info=True)
+
+    def _generate(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> str:
+        """实现 BaseChatModel 要求的方法"""
+        raise NotImplementedError()
+    
+    @property
+    def _llm_type(self) -> str:
+        """返回LLM类型"""
+        return "base_llm_service"
 
 class LLMServiceFactory:
     """大模型服务工厂"""

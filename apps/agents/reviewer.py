@@ -6,6 +6,7 @@ from ..llm.langchain_adapter import LangChainAdapter
 from ..knowledge.service import KnowledgeService
 from ..core.models import TestCase
 from .prompts import TestCaseReviewerPrompt
+from langchain_core.messages import SystemMessage, HumanMessage
 
 class TestCaseReviewerAgent:
     """测试用例评审Agent"""
@@ -113,4 +114,32 @@ class TestCaseReviewerAgent:
             return review_result
         except Exception as e:
             # 如果解析失败，返回错误信息
-            raise ValueError(f"无法解析评审结果: {str(e)}\n原始响应: {result}") 
+            raise ValueError(f"无法解析评审结果: {str(e)}\n原始响应: {result}")
+
+class Reviewer:
+    def __init__(self, llm_service: BaseLLMService, prompt_template):
+        self.llm_service = llm_service
+        self.prompt_template = prompt_template
+
+    def review(self, content: str, **kwargs) -> str:
+        """审查内容"""
+        try:
+            if isinstance(self.llm_service, LangChainAdapter):
+                # 使用提示模板
+                messages = self.prompt_template.format_messages(
+                    content=content,
+                    **kwargs
+                )
+            else:
+                # 使用基础消息格式
+                formatted_prompt = self.format_prompt(content, **kwargs)
+                messages = [
+                    SystemMessage(content=self.system_prompt),
+                    HumanMessage(content=formatted_prompt)
+                ]
+
+            response = self.llm_service.invoke(messages)
+            return response.content
+        except Exception as e:
+            # 错误处理
+            raise 
