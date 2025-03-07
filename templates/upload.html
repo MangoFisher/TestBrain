@@ -7,6 +7,37 @@
         .upload-box { border: 2px dashed #ccc; padding: 30px; text-align: center; margin: 20px 0; }
         #result { margin-top: 20px; color: green; }
         #error { color: red; }
+        .loading {
+            display: none;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #uploadBtn {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #uploadBtn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -16,19 +47,29 @@
             <input type="file" id="excelFile" name="excel_file" accept=".xlsx, .xls">
             <p>拖拽文件到此区域或点击选择文件</p>
         </div>
-        <button type="button" onclick="uploadFile()">上传并存储到知识库</button>
+        <button type="button" id="uploadBtn" onclick="uploadFile()">上传并存储到知识库</button>
     </form>
+    <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+        <span>正在处理测试用例，请稍候...</span>
+    </div>
     <div id="result"></div>
     <div id="error"></div>
 
     <script>
         function uploadFile() {
             const fileInput = document.getElementById('excelFile');
+            const uploadBtn = document.getElementById('uploadBtn');
             const file = fileInput.files[0];
             if (!file) {
                 showError('请选择文件');
                 return;
             }
+
+            // 显示加载状态
+            showLoading(true);
+            uploadBtn.disabled = true;
+            clearMessages();
 
             const formData = new FormData();
             formData.append('excel_file', file);
@@ -45,7 +86,21 @@
                     showError(data.error || '上传失败');
                 }
             })
-            .catch(error => showError('网络错误: ' + error));
+            .catch(error => showError('网络错误: ' + error))
+            .finally(() => {
+                // 隐藏加载状态
+                showLoading(false);
+                uploadBtn.disabled = false;
+            });
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function clearMessages() {
+            document.getElementById('result').innerText = '';
+            document.getElementById('error').innerText = '';
         }
 
         function showResult(message) {
