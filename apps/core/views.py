@@ -17,6 +17,12 @@ from ..knowledge.vector_store import MilvusVectorStore
 from ..knowledge.embedding import BGEM3Embedder
 from utils.logger_manager import get_logger
 
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import os
+from datetime import datetime
+from .milvus_helper import get_embedding_model, init_milvus_collection, process_excel
+
 logger = get_logger('core')
 
 # 获取LLM配置
@@ -219,7 +225,7 @@ def save_test_case(request):
         return JsonResponse({
             'success': True,
             'message': f'成功保存 {len(created_test_cases)} 条测试用例',
-            'test_case_ids': [case.id for case in created_test_cases]
+            'test_case_id': [case.id for case in created_test_cases]
         })
         
     except json.JSONDecodeError:
@@ -253,25 +259,53 @@ def review_view(request):
 # @login_required 先屏蔽登录
 @require_http_methods(["POST"])
 def review_api(request):
-    """测试用例评审API"""
+    """测试用例评审API接口"""
     try:
         data = json.loads(request.body)
-        test_case_id = data.get('test_case_id')
+        test_case_ids = data.get('test_case_ids')
         
-        test_case = get_object_or_404(TestCase, id=test_case_id)
+        logger.info(f"接收到评审请求，测试用例ID: {test_case_ids}")
+        
+        # 检查test_case_id是否为空
+        if not test_case_ids:
+            logger.error("测试用例ID为空")
+            return JsonResponse({
+                'success': False,
+                'message': '测试用例ID不能为空'
+            }, status=400)
+            
+        # 检查测试用例是否存在
+        try:
+            test_case = TestCase.objects.get(id=test_case_ids[0])
+            logger.info(f"找到测试用例: ID={test_case.id}")
+        except TestCase.DoesNotExist:
+            logger.error(f"找不到ID为 {test_case.id} 的测试用例")
+            return JsonResponse({
+                'success': False,
+                'message': f'找不到ID为 {test_case.id} 的测试用例'
+            }, status=404)
         
         # 调用测试用例评审Agent
+        logger.info("开始调用评审Agent...")
         review_result = test_case_reviewer.review(test_case)
+        logger.info(f"评审完成，结果: {review_result}")
         
         return JsonResponse({
             'success': True,
             'review_result': review_result
         })
-    except Exception as e:
+    except json.JSONDecodeError:
+        logger.error("JSON解析错误", exc_info=True)
         return JsonResponse({
             'success': False,
-            'message': str(e)
-        })
+            'message': '无效的JSON数据'
+        }, status=400)
+    except Exception as e:
+        logger.error(f"评审过程中出错: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'message': f'评审失败：{str(e)}'
+        }, status=500)
 
 # @login_required 先屏蔽登录
 @require_http_methods(["POST"])
@@ -389,4 +423,49 @@ def search_knowledge(request):
         return JsonResponse({
             'success': False,
             'message': str(e)
-        }) 
+        })
+
+@csrf_exempt
+def upload_test_cases(request):
+    """处理测试用例上传的视图函数"""
+    if request.method == 'GET':
+        return render(request, 'upload.html')
+    elif request.method == 'POST':
+        # 1. 接收文件
+        uploaded_file = request.FILES.get('excel_file')
+        if not uploaded_file:
+            return JsonResponse({'success': False, 'error': '未接收到文件'})
+        
+        if not uploaded_file.name.endswith(('.xlsx', '.xls')):
+            return JsonResponse({'success': False, 'error': '仅支持Excel文件'})
+
+        # 2. 保存临时文件
+        save_dir = 'uploads/'
+        os.makedirs(save_dir, exist_ok=True)
+        file_path = os.path.join(save_dir, f"temp_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx")
+        with open(file_path, 'wb+') as f:
+            for chunk in uploaded_file.chunks():
+                f.write(chunk)
+
+        try:
+            # 3. 处理Excel
+            test_cases = process_excel(file_path)
+            if not test_cases:
+                return JsonResponse({'success': False, 'error': 'Excel中无有效测试用例'})
+
+            # 4. 生成向量并入库
+            model = get_embedding_model()
+            embeddings = model.encode(test_cases, normalize_embeddings=True)
+            collection = init_milvus_collection()
+            data = [test_cases, embeddings.tolist()]
+            collection.insert(data)
+            collection.flush()
+
+            return JsonResponse({'success': True, 'count': len(test_cases)})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+        finally:
+            # 清理临时文件
+            if os.path.exists(file_path):
+                os.remove(file_path)
+    return JsonResponse({'success': False, 'error': '不支持的请求方法'})

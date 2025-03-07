@@ -227,7 +227,7 @@ function initReviewPage() {
                     'X-CSRFToken': getCookie('csrftoken')
                 },
                 body: JSON.stringify({
-                    test_case_ids: [testCaseId]
+                    test_case_id: [testCaseId]
                 })
             })
             .then(response => response.json())

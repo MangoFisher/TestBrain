@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试用例上传系统</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
+        .upload-box { border: 2px dashed #ccc; padding: 30px; text-align: center; margin: 20px 0; }
+        #result { margin-top: 20px; color: green; }
+        #error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>上传测试用例Excel文件</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <div class="upload-box">
+            <input type="file" id="excelFile" name="excel_file" accept=".xlsx, .xls">
+            <p>拖拽文件到此区域或点击选择文件</p>
+        </div>
+        <button type="button" onclick="uploadFile()">上传并存储到知识库</button>
+    </form>
+    <div id="result"></div>
+    <div id="error"></div>
+
+    <script>
+        function uploadFile() {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                showError('请选择文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('excel_file', file);
+
+            fetch('/upload/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showResult(`成功入库 ${data.count} 条测试用例`);
+                } else {
+                    showError(data.error || '上传失败');
+                }
+            })
+            .catch(error => showError('网络错误: ' + error));
+        }
+
+        function showResult(message) {
+            document.getElementById('result').innerText = message;
+            document.getElementById('error').innerText = '';
+        }
+
+        function showError(message) {
+            document.getElementById('error').innerText = message;
+            document.getElementById('result').innerText = '';
+        }
+    </script>
+</body>
+</html>

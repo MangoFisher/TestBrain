@@ -15,4 +15,7 @@ urlpatterns = [
     path('api/add-knowledge/', views.add_knowledge, name='add_knowledge'),
     path('api/knowledge-list/', views.knowledge_list, name='knowledge_list'),
     path('api/search-knowledge/', views.search_knowledge, name='search_knowledge'),
+
+    # 上传测试用例到知识库
+    path('upload/', views.upload_test_cases, name='upload'),
 ] 

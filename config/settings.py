@@ -24,6 +24,13 @@ ALLOWED_HOSTS = []
 # 是否启用Milvus
 ENABLE_MILVUS = False
 
+# 添加上传测试用例文件目录配置
+MEDIA_ROOT = os.path.join(BASE_DIR, 'uploads')
+MEDIA_URL = '/uploads/'
+
+# 允许所有域名跨域（开发环境用，生产环境需调整）
+CORS_ORIGIN_ALLOW_ALL = True
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
