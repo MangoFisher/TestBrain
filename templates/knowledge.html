@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Test Brain - 知识库管理{% endblock %}
 
@@ -46,27 +47,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // 搜索功能
-        const searchInput = document.getElementById('knowledge-search');
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                const knowledgeItems = document.querySelectorAll('.list-group-item');
-                
-                knowledgeItems.forEach(item => {
-                    const title = item.querySelector('h5').textContent.toLowerCase();
-                    const content = item.querySelector('p').textContent.toLowerCase();
-                    
-                    if (title.includes(searchTerm) || content.includes(searchTerm)) {
-                        item.style.display = '';
-                    } else {
-                        item.style.display = 'none';
-                    }
-                });
-            });
-        }
-    });
-</script>
+<script src="{% static 'js/knowledge.js' %}"></script>
 {% endblock %} 

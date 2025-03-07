@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Test Brain - 测试用例生成{% endblock %}
 
@@ -86,118 +87,8 @@
     <button id="save-button" class="btn btn-success">保存测试用例</button>
 </div>
 {% endif %}
+{% endblock %}
 
-<script>
-    // 保存用户选择的大模型到本地存储
-    document.getElementById('llm-provider').addEventListener('change', function() {
-        localStorage.setItem('preferred-llm-provider', this.value);
-    });
-    
-    // 页面加载时恢复用户之前的选择（如果后端没有指定值）
-    document.addEventListener('DOMContentLoaded', function() {
-        const providerSelect = document.getElementById('llm-provider');
-        // 只有当没有后端选择值时才从本地存储加载
-        if (!providerSelect.options[providerSelect.selectedIndex].hasAttribute('selected')) {
-            const savedProvider = localStorage.getItem('preferred-llm-provider');
-            if (savedProvider) {
-                // 确保保存的值在当前选项中存在
-                for (let i = 0; i < providerSelect.options.length; i++) {
-                    if (providerSelect.options[i].value === savedProvider) {
-                        providerSelect.value = savedProvider;
-                        break;
-                    }
-                }
-            }
-        }
-    });
-    
-    // 表单提交时显示加载指示器
-    document.querySelector('form').addEventListener('submit', function() {
-        document.getElementById('loading-indicator').style.display = 'block';
-        document.getElementById('generate-button').disabled = true;
-    });
-    
-    document.addEventListener('DOMContentLoaded', function() {
-        const saveButton = document.getElementById('save-button');
-        if (!saveButton) {
-            console.error('找不到保存按钮元素');
-            return;
-        }
-
-        saveButton.addEventListener('click', function() {
-            console.log('保存按钮被点击'); // 调试日志
-            
-            // 获取页面上的数据
-            const requirementElement = document.getElementById('input-text');
-            const testCasesScript = document.getElementById('test-cases-data');
-            const llmProviderElement = document.getElementById('llm-provider');
-            
-            // 检查元素是否存在并分别记录
-            if (!requirementElement) {
-                console.error('缺失需求描述元素 (input-text)');
-            }
-            if (!testCasesScript) {
-                console.error('缺失测试用例数据元素 (test-cases-data)');
-            }
-            if (!llmProviderElement) {
-                console.error('缺失LLM提供商选择元素 (llm-provider)');
-            }
-            
-            if (!requirementElement || !testCasesScript || !llmProviderElement) {
-                alert('页面元素缺失，无法保存数据。请查看控制台获取详细信息。');
-                return;
-            }
-
-            try {
-                // 从script标签中获取JSON数据
-                const testCasesData = JSON.parse(testCasesScript.textContent);
-                
-                // 发送保存请求
-                fetch('/core/save-test-case/', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken'),
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        requirement: requirementElement.value,
-                        test_cases: testCasesData,
-                        llm_provider: llmProviderElement.value
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('测试用例保存成功！');
-                    } else {
-                        alert('保存失败：' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('保存失败:', error);
-                    alert('保存失败，请查看控制台获取详细信息');
-                });
-            } catch (error) {
-                console.error('解析测试用例数据失败:', error);
-                alert('解析测试用例数据失败，请查看控制台获取详细信息');
-            }
-        });
-    });
-
-    // 获取CSRF Token的辅助函数
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-</script>
+{% block extra_js %}
+<script src="{% static 'js/generate.js' %}"></script>
 {% endblock %} 

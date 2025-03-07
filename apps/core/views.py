@@ -60,7 +60,7 @@ test_case_reviewer = TestCaseReviewerAgent(llm_service, knowledge_service)
 
 # @login_required 先屏蔽登录
 def index(request):
-    """首页视图"""
+    """页面-首页视图"""
     # 获取测试用例统计数据
     total_test_cases = TestCase.objects.count()
     pending_review_count = TestCase.objects.filter(status='pending_review').count()
@@ -82,6 +82,9 @@ def index(request):
 
 # @login_required 先屏蔽登录
 def generate(request):
+    """
+    页面-测试用例生成页面视图函数
+    """
     logger.info("===== 进入generate视图函数 =====")
     logger.info(f"请求方法: {request.method}")
     context = {
@@ -243,7 +246,7 @@ def save_test_case(request):
 
 # @login_required 先屏蔽登录
 def review_view(request):
-    """测试用例评审页面"""
+    """页面-测试用例评审页面视图"""
     pending_test_cases = TestCase.objects.filter(status='pending_review')
     approved_test_cases = TestCase.objects.filter(status='approved')
     rejected_test_cases = TestCase.objects.filter(status='rejected')

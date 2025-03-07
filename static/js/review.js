@@ -152,4 +152,147 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-md-6">
                             <h5>缺点:</h5>
                             <ul>
-                                ${result.weaknesses.map(item => `<li>${item}</li>`
+                                ${result.weaknesses.map(item => `<li>${item}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <div class="form-group">
+                            <label for="review-comments-${result.test_case_id}">评审意见:</label>
+                            <textarea id="review-comments-${result.test_case_id}" class="form-control" rows="3"></textarea>
+                        </div>
+                        
+                        <div class="btn-group">
+                            <button class="btn btn-success status-button" data-id="${result.test_case_id}" data-status="approved">
+                                通过
+                            </button>
+                            <button class="btn btn-danger status-button" data-id="${result.test_case_id}" data-status="rejected">
+                                拒绝
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+        // 重新绑定新添加的按钮事件
+        container.querySelectorAll('.status-button').forEach(button => {
+            button.addEventListener('click', function() {
+                const testCaseId = this.getAttribute('data-id');
+                const status = this.getAttribute('data-status');
+                const commentsElement = document.getElementById(`review-comments-${testCaseId}`);
+                const comments = commentsElement ? commentsElement.value.trim() : '';
+                
+                if (status === 'rejected' && !comments) {
+                    showNotification('拒绝测试用例时必须提供评审意见', 'error');
+                    return;
+                }
+                
+                // 禁用按钮
+                this.disabled = true;
+                
+                // 发送请求到后端
+                fetch('/api/update-status/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        test_case_id: testCaseId,
+                        status: status,
+                        comments: comments
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    this.disabled = false;
+                    
+                    if (data.success) {
+                        showNotification('测试用例状态已更新', 'success');
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showNotification(data.message || '更新测试用例状态失败', 'error');
+                    }
+                })
+                .catch(error => {
+                    this.disabled = false;
+                    showNotification('请求失败: ' + error.message, 'error');
+                });
+            });
+        });
+    }
+    
+    // 更新标签页计数
+    function updateTabCounts() {
+        const pendingCount = document.querySelectorAll('#pending .test-case-item').length;
+        const approvedCount = document.querySelectorAll('#approved .test-case-item').length;
+        const rejectedCount = document.querySelectorAll('#rejected .test-case-item').length;
+        
+        document.querySelector('#pending-tab .badge').textContent = pendingCount;
+        document.querySelector('#approved-tab .badge').textContent = approvedCount;
+        document.querySelector('#rejected-tab .badge').textContent = rejectedCount;
+    }
+    
+    // 获取评分对应的徽章类
+    function getScoreBadgeClass(score) {
+        if (score >= 8) return 'badge-success';
+        if (score >= 6) return 'badge-warning';
+        return 'badge-danger';
+    }
+    
+    // 显示通知
+    function showNotification(message, type = 'info') {
+        // 如果页面上有通知容器，使用它
+        let container = document.getElementById('notification-container');
+        
+        // 如果没有，创建一个
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'notification-container';
+            container.style.position = 'fixed';
+            container.style.top = '20px';
+            container.style.right = '20px';
+            container.style.zIndex = '9999';
+            document.body.appendChild(container);
+        }
+        
+        // 创建通知元素
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} alert-dismissible fade show`;
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        `;
+        
+        // 添加到容器
+        container.appendChild(notification);
+        
+        // 设置自动关闭
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 5000);
+    }
+    
+    // 获取CSRF Token的辅助函数
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
