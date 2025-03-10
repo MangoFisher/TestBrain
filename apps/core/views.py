@@ -50,8 +50,7 @@ vector_store = MilvusVectorStore(
 )
 
 embedder = BGEM3Embedder(
-    api_key=settings.EMBEDDING_CONFIG['api_key'],
-    api_url=settings.EMBEDDING_CONFIG['api_url']
+    model_name="BAAI/bge-m3"
 )
 
 knowledge_service = KnowledgeService(vector_store, embedder)
@@ -416,6 +415,8 @@ def search_knowledge(request):
             })
         
         # 搜索知识库
+        query_embedding = embedder.get_embeddings(query)[0]
+        logger.info(f"查询文本: '{query}', 向量维度: {len(query_embedding)}, 前5个维度: {query_embedding[:5]}")
         results = knowledge_service.search_knowledge(query)
         
         return JsonResponse({
@@ -434,41 +435,67 @@ def upload_test_cases(request):
     if request.method == 'GET':
         return render(request, 'upload.html')
     elif request.method == 'POST':
-        # 1. 接收文件
-        uploaded_file = request.FILES.get('excel_file')
-        if not uploaded_file:
-            return JsonResponse({'success': False, 'error': '未接收到文件'})
-        
-        if not uploaded_file.name.endswith(('.xlsx', '.xls')):
-            return JsonResponse({'success': False, 'error': '仅支持Excel文件'})
-
-        # 2. 保存临时文件
-        save_dir = 'uploads/'
-        os.makedirs(save_dir, exist_ok=True)
-        file_path = os.path.join(save_dir, f"temp_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx")
-        with open(file_path, 'wb+') as f:
-            for chunk in uploaded_file.chunks():
-                f.write(chunk)
-
         try:
+            # 1. 接收文件
+            uploaded_file = request.FILES.get('excel_file')
+            if not uploaded_file:
+                return JsonResponse({'success': False, 'error': '未接收到文件'})
+            
+            if not uploaded_file.name.endswith(('.xlsx', '.xls')):
+                return JsonResponse({'success': False, 'error': '仅支持Excel文件'})
+
+            # 2. 保存临时文件
+            save_dir = 'uploads/'
+            os.makedirs(save_dir, exist_ok=True)
+            file_path = os.path.join(save_dir, f"temp_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx")
+            with open(file_path, 'wb+') as f:
+                for chunk in uploaded_file.chunks():
+                    f.write(chunk)
+
             # 3. 处理Excel
-            test_cases = process_excel(file_path)
+            test_cases, texts = process_excel(file_path)  # 获取原始数据和文本
             if not test_cases:
                 return JsonResponse({'success': False, 'error': 'Excel中无有效测试用例'})
 
-            # 4. 生成向量并入库
+            # 4. 生成向量
             model = get_embedding_model()
-            embeddings = model.encode(test_cases, normalize_embeddings=True)
-            collection = init_milvus_collection()
-            data = [test_cases, embeddings.tolist()]
-            collection.insert(data)
-            collection.flush()
+            embeddings = model.encode(texts, normalize_embeddings=True)
+            logger.info(f"上传的向量维度: {embeddings.shape}, 前5个维度值: {embeddings[0][:5]}")
 
-            return JsonResponse({'success': True, 'count': len(test_cases)})
+            # 5. 构建文档
+            documents = []
+            for i, row in enumerate(test_cases):
+                doc = {
+                    "embedding": embeddings[i].tolist(),
+                    "case_name": str(row['用例名称']),
+                    "case_id": str(row['ID']),
+                    "module": str(row['所属模块']),
+                    "precondition": str(row['前置条件']),
+                    "steps": str(row['步骤描述']),
+                    "expected": str(row['预期结果']),
+                    "tags": str(row['标签']),
+                    "priority": str(row['用例等级']),
+                    "creator": str(row['创建人']),
+                    "create_time": str(row['创建时间'])
+                }
+                documents.append(doc)
+
+            # 6. 添加到向量数据库
+            vector_store = MilvusVectorStore()
+            vector_store.add_documents(documents)
+            
+            return JsonResponse({
+                'success': True, 
+                'count': len(documents),
+                'message': f'成功导入 {len(documents)} 条测试用例'
+            })
+            
         except Exception as e:
+            logger.error(f"处理上传文件时出错: {str(e)}", exc_info=True)
             return JsonResponse({'success': False, 'error': str(e)})
         finally:
             # 清理临时文件
             if os.path.exists(file_path):
                 os.remove(file_path)
+                
     return JsonResponse({'success': False, 'error': '不支持的请求方法'})

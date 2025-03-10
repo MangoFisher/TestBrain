@@ -152,7 +152,7 @@ LLM_PROVIDERS = {
 VECTOR_DB_CONFIG = {
     'host': 'localhost',
     'port': '19530',
-    'collection_name': 'test_brain_knowledge',
+    'collection_name': 'test_cases',
 }
 
 # 嵌入模型配置

@@ -37,22 +37,48 @@ class KnowledgeService:
         """搜索相关知识"""
         # 获取查询的嵌入向量
         query_embedding = self.embedder.get_embeddings(query)[0]
+        self.logger.info(f"查询文本: '{query}', 向量维度: {len(query_embedding)}, 前5个维度: {query_embedding[:5]}")
+
         
         # 在向量数据库中搜索
         results = self.vector_store.search(query_embedding, top_k=top_k)
         
         return results 
 
-    def search_relevant_knowledge(self, query: str) -> str:
+    def search_relevant_knowledge(self, query: str, top_k: int = 5) -> str:
         """
-        搜索相关知识
+        搜索跟输入文本相关的测试用例
         
         Args:
             query: 查询文本
             
         Returns:
-            str: 相关知识文本，如果没有找到则返回空字符串
+            str: 跟查询需求有关的测试用例内容，如果没有找到则返回空字符串
         """
-        # TODO: 实现知识搜索逻辑
         self.logger.info(f"搜索知识: {query}")
-        return ""  # 暂时返回空字符串，后续实现具体搜索逻辑 
+        try:
+            # 复用已有的search_knowledge函数
+            results = self.search_knowledge(query, top_k=top_k)
+            # self.logger.info(f"知识库搜索结果: {results}")
+            
+            if not results:
+                return ""
+            
+            # 过滤掉第一条（因为它是查询本身）并处理其余结果
+            valid_results = [r for r in results[1:] if r['case_name'] and r['steps'] and r['expected']]
+            
+            # 拼接测试用例文本
+            knowledge_texts = []
+            for item in valid_results:
+                case_text = (
+                    f"测试用例描述: {item['case_name'].strip()}\n"
+                    f"测试步骤:\n{item['steps'].strip()}\n"
+                    f"预期结果:\n{item['expected'].strip()}"
+                )
+                knowledge_texts.append(case_text)
+            
+            return "\n\n".join(knowledge_texts)
+            
+        except Exception as e:
+            self.logger.warning(f"获取知识上下文失败: {str(e)}")
+            return ""

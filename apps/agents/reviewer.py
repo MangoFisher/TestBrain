@@ -79,30 +79,31 @@ class TestCaseReviewerAgent:
             logger.error(f"格式化提示词时出错: {str(e)}", exc_info=True)
             raise Exception(f"格式化提示词失败: {str(e)}")
 
-class Reviewer:
-    def __init__(self, llm_service: BaseLLMService, prompt_template):
-        self.llm_service = llm_service
-        self.prompt_template = prompt_template
+#TODO:确定没有使用后需要删除
+# class Reviewer:
+#     def __init__(self, llm_service: BaseLLMService, prompt_template):
+#         self.llm_service = llm_service
+#         self.prompt_template = prompt_template
 
-    def review(self, content: str, **kwargs) -> str:
-        """审查内容"""
-        try:
-            if isinstance(self.llm_service, LangChainAdapter):
-                # 使用提示模板
-                messages = self.prompt_template.format_messages(
-                    content=content,
-                    **kwargs
-                )
-            else:
-                # 使用基础消息格式
-                formatted_prompt = self.format_prompt(content, **kwargs)
-                messages = [
-                    SystemMessage(content=self.system_prompt),
-                    HumanMessage(content=formatted_prompt)
-                ]
+#     def review(self, content: str, **kwargs) -> str:
+#         """审查内容"""
+#         try:
+#             if isinstance(self.llm_service, LangChainAdapter):
+#                 # 使用提示模板
+#                 messages = self.prompt_template.format_messages(
+#                     content=content,
+#                     **kwargs
+#                 )
+#             else:
+#                 # 使用基础消息格式
+#                 formatted_prompt = self.format_prompt(content, **kwargs)
+#                 messages = [
+#                     SystemMessage(content=self.system_prompt),
+#                     HumanMessage(content=formatted_prompt)
+#                 ]
 
-            response = self.llm_service.invoke(messages)
-            return response.content
-        except Exception as e:
-            # 错误处理
-            raise 
+#             response = self.llm_service.invoke(messages)
+#             return response.content
+#         except Exception as e:
+#             # 错误处理
+#             raise 

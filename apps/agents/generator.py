@@ -17,11 +17,13 @@ class TestCaseGeneratorAgent:
     
     def generate(self, input_text: str, input_type: str = "requirement") -> List[Dict[str, Any]]:
         """生成测试用例"""
+        self.logger.info(f"开始生成测试用例，进入生成测试用例的TestCaseGeneratorAgent")
         # 确定输入类型描述
         input_type_desc = "需求描述" if input_type == "requirement" else "代码片段"
         
         # 获取知识上下文
         knowledge_context = self._get_knowledge_context(input_text)
+        self.logger.info(f"获取到知识库上下文: {knowledge_context}")
         
         # 构建消息
         messages = [
@@ -57,10 +59,10 @@ class TestCaseGeneratorAgent:
         """获取相关知识上下文"""
         try:
             # 暂时返回空字符串，直到KnowledgeService实现完成
-            return ""
-            # knowledge = self.knowledge_service.search_relevant_knowledge(input_text)
-            # if knowledge:
-            #     return f"\n相关知识：\n{knowledge}"
+            # return ""
+            knowledge = self.knowledge_service.search_relevant_knowledge(input_text)
+            if knowledge:
+                return f"\n相关知识：\n{knowledge}"
         except Exception as e:
             self.logger.warning(f"获取知识上下文失败: {str(e)}")
         return ""
@@ -84,23 +86,24 @@ class TestCaseGeneratorAgent:
                     f"测试用例 #{i+1} 的测试步骤数量 ({len(test_case['test_steps'])}) "
                     f"与预期结果数量 ({len(test_case['expected_results'])}) 不一致"
                 )
-
-class Generator:
-    def __init__(self, llm_service: BaseLLMService):
-        self.llm_service = llm_service
+            
+#TODO:确定没有使用后需要删除
+# class Generator:
+#     def __init__(self, llm_service: BaseLLMService):
+#         self.llm_service = llm_service
     
-    def generate(self, prompt: str, system_prompt: str = None) -> str:
-        """生成响应"""
-        messages = []
+#     def generate(self, prompt: str, system_prompt: str = None) -> str:
+#         """生成响应"""
+#         messages = []
         
-        if system_prompt:
-            messages.append(SystemMessage(content=system_prompt))
+#         if system_prompt:
+#             messages.append(SystemMessage(content=system_prompt))
         
-        messages.append(HumanMessage(content=prompt))
+#         messages.append(HumanMessage(content=prompt))
         
-        try:
-            response = self.llm_service.invoke(messages)
-            return response.content
-        except Exception as e:
-            # 错误处理
-            raise
+#         try:
+#             response = self.llm_service.invoke(messages)
+#             return response.content
+#         except Exception as e:
+#             # 错误处理
+#             raise
