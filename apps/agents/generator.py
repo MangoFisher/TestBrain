@@ -87,23 +87,3 @@ class TestCaseGeneratorAgent:
                     f"与预期结果数量 ({len(test_case['expected_results'])}) 不一致"
                 )
             
-#TODO:确定没有使用后需要删除
-# class Generator:
-#     def __init__(self, llm_service: BaseLLMService):
-#         self.llm_service = llm_service
-    
-#     def generate(self, prompt: str, system_prompt: str = None) -> str:
-#         """生成响应"""
-#         messages = []
-        
-#         if system_prompt:
-#             messages.append(SystemMessage(content=system_prompt))
-        
-#         messages.append(HumanMessage(content=prompt))
-        
-#         try:
-#             response = self.llm_service.invoke(messages)
-#             return response.content
-#         except Exception as e:
-#             # 错误处理
-#             raise
