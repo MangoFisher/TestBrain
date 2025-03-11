@@ -40,9 +40,21 @@
         margin-top: 15px;
     }
 
+    .submit-container {
+        text-align: center;
+        margin-top: 20px;
+    }
+
     .submit-button {
         padding: 12px 40px;
         font-size: 16px;
+    }
+
+    .selected-file {
+        margin-top: 15px;
+        color: #28a745;
+        font-weight: 500;
+        display: none;  /* 初始状态隐藏 */
     }
 </style>
 {% endblock %}
@@ -50,20 +62,85 @@
 {% block content %}
 <div class="upload-container">
     <h4 class="mb-4">上传测试用例Excel文件</h4>
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" id="uploadForm" onsubmit="return handleSubmit(event)">
         {% csrf_token %}
         <div class="upload-area">
-            <input type="file" name="excel_file" id="excel_file" style="display: none;" accept=".xlsx,.xls">
+            <input type="file" name="excel_file" id="excel_file" style="display: none;" accept=".xlsx,.xls" onchange="updateFileName(this)">
             <button type="button" class="btn btn-primary file-input-button" onclick="document.getElementById('excel_file').click()">
                 选择文件
             </button>
             <div class="upload-hint">
                 拖拽文件到此区域或点击选择文件
             </div>
+            <div id="selected-file" class="selected-file"></div>
+            <div id="uploadStatus" style="margin-top: 10px; color: #666;"></div>
         </div>
-        <div class="text-center">
-            <button type="submit" class="btn btn-success submit-button">上传并存储到知识库</button>
+        <div class="submit-container">
+            <button type="submit" class="btn btn-success submit-button" id="submitBtn">上传并存储到知识库</button>
         </div>
     </form>
 </div>
+
+<script>
+function updateFileName(input) {
+    const selectedFile = document.getElementById('selected-file');
+    if (input.files && input.files[0]) {
+        selectedFile.style.display = 'block';
+        selectedFile.textContent = '已选择文件: ' + input.files[0].name;
+    } else {
+        selectedFile.style.display = 'none';
+        selectedFile.textContent = '';
+    }
+}
+
+async function handleSubmit(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const fileInput = form.querySelector('input[type="file"]');
+    const submitBtn = document.getElementById('submitBtn');
+    const statusDiv = document.getElementById('uploadStatus');
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        statusDiv.textContent = '请先选择要上传的文件';
+        statusDiv.style.color = '#dc3545';
+        return false;
+    }
+
+    submitBtn.disabled = true;
+    statusDiv.textContent = '文件上传中，请稍候...';
+    statusDiv.style.color = '#dc3545';
+    statusDiv.style.fontWeight = 'bold';
+
+    try {
+        const formData = new FormData(form);
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            statusDiv.textContent = `上传成功！成功导入 ${result.count} 条测试用例`;
+            statusDiv.style.color = '#28a745';
+            fileInput.value = '';
+            document.getElementById('selected-file').style.display = 'none';
+        } else {
+            statusDiv.textContent = result.error || '上传失败，请重试';
+            statusDiv.style.color = '#dc3545';
+        }
+    } catch (error) {
+        statusDiv.textContent = '上传过程中发生错误，请重试';
+        statusDiv.style.color = '#dc3545';
+    } finally {
+        submitBtn.disabled = false;
+    }
+
+    return false;
+}
+</script>
 {% endblock %}
