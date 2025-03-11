@@ -1,117 +1,69 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>测试用例上传系统</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
-        .upload-box { border: 2px dashed #ccc; padding: 30px; text-align: center; margin: 20px 0; }
-        #result { margin-top: 20px; color: green; }
-        #error { color: red; }
-        .loading {
-            display: none;
-            margin: 20px 0;
-            text-align: center;
-        }
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        #uploadBtn {
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        #uploadBtn:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-    </style>
-</head>
-<body>
-    <h1>上传测试用例Excel文件</h1>
-    <form id="uploadForm" enctype="multipart/form-data">
-        <div class="upload-box">
-            <input type="file" id="excelFile" name="excel_file" accept=".xlsx, .xls">
-            <p>拖拽文件到此区域或点击选择文件</p>
+{% extends "base.html" %}
+
+{% block title %}TestBrain - 测试用例上传{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-container {
+        margin: 20px;
+        padding: 20px;
+    }
+    
+    .upload-area {
+        border: 2px dashed #ddd;
+        border-radius: 8px;
+        padding: 60px 40px;
+        text-align: center;
+        background-color: #f8f9fa;
+        margin: 30px 0;
+        min-height: 300px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .upload-area:hover {
+        border-color: #007bff;
+        background-color: #f1f7ff;
+    }
+
+    .file-input-button {
+        padding: 12px 30px;
+        font-size: 16px;
+        margin-bottom: 20px;
+    }
+
+    .upload-hint {
+        color: #666;
+        font-size: 14px;
+        margin-top: 15px;
+    }
+
+    .submit-button {
+        padding: 12px 40px;
+        font-size: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="upload-container">
+    <h4 class="mb-4">上传测试用例Excel文件</h4>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="upload-area">
+            <input type="file" name="excel_file" id="excel_file" style="display: none;" accept=".xlsx,.xls">
+            <button type="button" class="btn btn-primary file-input-button" onclick="document.getElementById('excel_file').click()">
+                选择文件
+            </button>
+            <div class="upload-hint">
+                拖拽文件到此区域或点击选择文件
+            </div>
         </div>
-        <button type="button" id="uploadBtn" onclick="uploadFile()">上传并存储到知识库</button>
+        <div class="text-center">
+            <button type="submit" class="btn btn-success submit-button">上传并存储到知识库</button>
+        </div>
     </form>
-    <div class="loading" id="loading">
-        <div class="loading-spinner"></div>
-        <span>正在处理测试用例，请稍候...</span>
-    </div>
-    <div id="result"></div>
-    <div id="error"></div>
-
-    <script>
-        function uploadFile() {
-            const fileInput = document.getElementById('excelFile');
-            const uploadBtn = document.getElementById('uploadBtn');
-            const file = fileInput.files[0];
-            if (!file) {
-                showError('请选择文件');
-                return;
-            }
-
-            // 显示加载状态
-            showLoading(true);
-            uploadBtn.disabled = true;
-            clearMessages();
-
-            const formData = new FormData();
-            formData.append('excel_file', file);
-
-            fetch('/upload/', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showResult(`成功入库 ${data.count} 条测试用例`);
-                } else {
-                    showError(data.error || '上传失败');
-                }
-            })
-            .catch(error => showError('网络错误: ' + error))
-            .finally(() => {
-                // 隐藏加载状态
-                showLoading(false);
-                uploadBtn.disabled = false;
-            });
-        }
-
-        function showLoading(show) {
-            document.getElementById('loading').style.display = show ? 'block' : 'none';
-        }
-
-        function clearMessages() {
-            document.getElementById('result').innerText = '';
-            document.getElementById('error').innerText = '';
-        }
-
-        function showResult(message) {
-            document.getElementById('result').innerText = message;
-            document.getElementById('error').innerText = '';
-        }
-
-        function showError(message) {
-            document.getElementById('error').innerText = message;
-            document.getElementById('result').innerText = '';
-        }
-    </script>
-</body>
-</html>
+</div>
+{% endblock %}

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Test Brain - 测试用例评审{% endblock %}
+{% block title %}TestBrain - 测试用例评审{% endblock %}
 
 {% block content %}
 <div class="card">
@@ -31,37 +31,32 @@
             <!-- 待评审测试用例 -->
             <div class="tab-pane fade show active" id="pending" role="tabpanel">
                 {% if pending_test_cases %}
-                    {% for test_case in pending_test_cases %}
-                        <div id="test-case-{{ test_case.id }}" class="test-case-item pending">
-                            <div class="d-flex justify-content-between">
-                                <span class="badge badge-warning status-badge">待评审</span>
-                            </div>
-                            <p>{{ test_case.description }}</p>
-                            
-                            <div class="form-group">
-                                <label>测试步骤:</label>
-                                <div class="test-steps">{{ test_case.test_steps|safe }}</div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label>预期结果:</label>
-                                <div class="expected-results">{{ test_case.expected_results|safe }}</div>
-                            </div>
-                            
-                            {% if test_case.code_snippet %}
-                                <div class="form-group">
-                                    <label>代码片段:</label>
-                                    <pre><code>{{ test_case.code_snippet }}</code></pre>
-                                </div>
-                            {% endif %}
-                            
-                            <div class="text-right">
-                                <button class="btn btn-primary review-button" data-id="{{ test_case.id }}">评审</button>
-                            </div>
-                            
-                            <div id="review-result-{{ test_case.id }}"></div>
-                        </div>
-                    {% endfor %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>状态</th>
+                                <th>用例描述</th>
+                                <th>测试步骤</th>
+                                <th>预期结果</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for test_case in pending_test_cases %}
+                            <tr>
+                                <td><span class="badge badge-warning">待评审</span></td>
+                                <td>{{ test_case.description }}</td>
+                                <td>{{ test_case.test_steps|safe }}</td>
+                                <td>{{ test_case.expected_results|safe }}</td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm review-button" data-id="{{ test_case.id }}">评审</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
                 {% else %}
                     <div class="alert alert-info">没有待评审的测试用例</div>
                 {% endif %}
@@ -70,36 +65,34 @@
             <!-- 已通过测试用例 -->
             <div class="tab-pane fade" id="approved" role="tabpanel">
                 {% if approved_test_cases %}
-                    {% for test_case in approved_test_cases %}
-                        <div id="test-case-{{ test_case.id }}" class="test-case-item approved">
-                            <div class="d-flex justify-content-between">
-                                <h3>{{ test_case.title }}</h3>
-                                <span class="badge badge-success status-badge">评审通过</span>
-                            </div>
-                            <p>{{ test_case.description }}</p>
-                            
-                            <div class="form-group">
-                                <label>测试步骤:</label>
-                                <div class="test-steps">{{ test_case.test_steps|safe }}</div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label>预期结果:</label>
-                                <div class="expected-results">{{ test_case.expected_results|safe }}</div>
-                            </div>
-                            
-                            {% if test_case.reviews.exists %}
-                                <div class="form-group">
-                                    <label>评审意见:</label>
-                                    <div class="card">
-                                        <div class="card-body">
-                                            {{ test_case.reviews.last.review_comments }}
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>状态</th>
+                                <th>用例描述</th>
+                                <th>测试步骤</th>
+                                <th>预期结果</th>
+                                <th>评审意见</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for test_case in approved_test_cases %}
+                            <tr>
+                                <td><span class="badge badge-success">已通过</span></td>
+                                <td>{{ test_case.description }}</td>
+                                <td>{{ test_case.test_steps|safe }}</td>
+                                <td>{{ test_case.expected_results|safe }}</td>
+                                <td>
+                                    {% if test_case.reviews.exists %}
+                                        {{ test_case.reviews.last.review_comments }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
                 {% else %}
                     <div class="alert alert-info">没有评审通过的测试用例</div>
                 {% endif %}
@@ -108,42 +101,38 @@
             <!-- 未通过测试用例 -->
             <div class="tab-pane fade" id="rejected" role="tabpanel">
                 {% if rejected_test_cases %}
-                    {% for test_case in rejected_test_cases %}
-                        <div id="test-case-{{ test_case.id }}" class="test-case-item rejected">
-                            <div class="d-flex justify-content-between">
-                                <h3>{{ test_case.title }}</h3>
-                                <span class="badge badge-danger status-badge">评审未通过</span>
-                            </div>
-                            <p>{{ test_case.description }}</p>
-                            
-                            <div class="form-group">
-                                <label>测试步骤:</label>
-                                <div class="test-steps">{{ test_case.test_steps|safe }}</div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label>预期结果:</label>
-                                <div class="expected-results">{{ test_case.expected_results|safe }}</div>
-                            </div>
-                            
-                            {% if test_case.reviews.exists %}
-                                <div class="form-group">
-                                    <label>评审意见:</label>
-                                    <div class="card">
-                                        <div class="card-body">
-                                            {{ test_case.reviews.last.review_comments }}
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endif %}
-                            
-                            <div class="text-right">
-                                <button class="btn btn-primary review-button" data-id="{{ test_case.id }}">重新评审</button>
-                            </div>
-                            
-                            <div id="review-result-{{ test_case.id }}"></div>
-                        </div>
-                    {% endfor %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>状态</th>
+                                <th>用例描述</th>
+                                <th>测试步骤</th>
+                                <th>预期结果</th>
+                                <th>评审意见</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for test_case in rejected_test_cases %}
+                            <tr>
+                                <td><span class="badge badge-danger">未通过</span></td>
+                                <td>{{ test_case.description }}</td>
+                                <td>{{ test_case.test_steps|safe }}</td>
+                                <td>{{ test_case.expected_results|safe }}</td>
+                                <td>
+                                    {% if test_case.reviews.exists %}
+                                        {{ test_case.reviews.last.review_comments }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm review-button" data-id="{{ test_case.id }}">重新评审</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
                 {% else %}
                     <div class="alert alert-info">没有评审未通过的测试用例</div>
                 {% endif %}
