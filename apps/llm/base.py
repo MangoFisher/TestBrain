@@ -83,7 +83,7 @@ class LLMServiceFactory:
     @staticmethod
     def create(provider: str, **config) -> BaseChatModel:
         """创建LLM服务实例"""
-        logger = get_logger('llm')
+        logger = get_logger(__class__.__name__)
         logger.info(f"创建LLM服务: provider={provider}")
         
         # 获取LLM配置
