@@ -21,7 +21,7 @@ class BaseLLMService(BaseChatModel):
     
     def __init__(self):
         # 使用统一日志管理器获取日志记录器
-        self.logger = get_logger(f'llm.{self.__class__.__name__}')
+        self.logger = get_logger(self.__class__.__name__)
     
     @abstractmethod
     def generate(self, prompt: str, **kwargs) -> str:

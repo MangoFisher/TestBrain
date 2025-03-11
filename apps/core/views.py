@@ -23,7 +23,7 @@ import os
 from datetime import datetime
 from .milvus_helper import get_embedding_model, init_milvus_collection, process_excel
 
-logger = get_logger('core')
+logger = get_logger(__name__)
 
 # 获取LLM配置
 llm_config = getattr(settings, 'LLM_PROVIDERS', {})

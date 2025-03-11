@@ -5,7 +5,7 @@ class LoggingCallbackHandler(BaseCallbackHandler):
     """日志记录回调处理器"""
     
     def __init__(self):
-        self.logger = get_logger('langchain')
+        self.logger = get_logger(self.__class__.__name__)
     
     def on_llm_start(self, serialized, prompts, **kwargs):
         """LLM开始生成时的回调"""

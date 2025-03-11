@@ -6,7 +6,7 @@ import os
 from django.conf import settings
 from utils.logger_manager import get_logger
 
-logger = get_logger('vector_store')
+logger = get_logger(__name__)
 
 class MilvusVectorStore:
     """Milvus向量数据库服务"""

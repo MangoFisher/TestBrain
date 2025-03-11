@@ -10,7 +10,7 @@ class KnowledgeService:
     def __init__(self, vector_store: MilvusVectorStore, embedder: BGEM3Embedder):
         self.vector_store = vector_store
         self.embedder = embedder
-        self.logger = get_logger('knowledge')
+        self.logger = get_logger(self.__class__.__name__)
         
     def add_knowledge(self, title: str, content: str) -> int:
         """添加知识到知识库"""

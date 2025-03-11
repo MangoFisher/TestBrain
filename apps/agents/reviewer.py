@@ -8,8 +8,9 @@ from ..knowledge.service import KnowledgeService
 from ..core.models import TestCase
 from .prompts import TestCaseReviewerPrompt
 from langchain_core.messages import SystemMessage, HumanMessage
+from utils.logger_manager import get_logger
 
-logger = logging.getLogger(__name__)
+
 
 class TestCaseReviewerAgent:
     """测试用例评审Agent"""
@@ -18,6 +19,8 @@ class TestCaseReviewerAgent:
         self.llm_service = llm_service
         self.knowledge_service = knowledge_service
         self.prompt = TestCaseReviewerPrompt()
+        self.logger = get_logger(self.__class__.__name__)  # 添加logger
+
     
     def review(self, test_case: TestCase) -> Dict[str, Any]:
         """评审测试用例"""
@@ -38,17 +41,17 @@ class TestCaseReviewerAgent:
             ]
             
             # 记录消息内容
-            logger.info("评审消息详细信息:")
+            self.logger.info("评审消息详细信息:")
             for msg in messages:
-                logger.info(f"消息类型: {type(msg).__name__}")
-                logger.info(f"消息内容:\n{msg.content}")
-                logger.info("="*50)
+                self.logger.info(f"消息类型: {type(msg).__name__}")
+                self.logger.info(f"消息内容:\n{msg.content}")
+                self.logger.info("="*50)
             
             # 调用LLM服务
             result = self.llm_service.invoke(messages)  # 使用 invoke 方法替代 chat
             
             # 记录LLM返回结果
-            logger.info(f"LLM评审结果:\n"
+            self.logger.info(f"LLM评审结果:\n"
                        f"{'='*50}\n"
                        f"{result}\n"
                        f"{'='*50}")
@@ -56,7 +59,7 @@ class TestCaseReviewerAgent:
             return result
             
         except Exception as e:
-            logger.error(f"评审过程出错: {str(e)}", exc_info=True)
+            self.logger.error(f"评审过程出错: {str(e)}", exc_info=True)
             raise Exception(f"评审失败: {str(e)}")
 
     def _format_prompt(self, test_case):
@@ -76,5 +79,5 @@ class TestCaseReviewerAgent:
             return prompt.strip()
             
         except Exception as e:
-            logger.error(f"格式化提示词时出错: {str(e)}", exc_info=True)
+            self.logger.error(f"格式化提示词时出错: {str(e)}", exc_info=True)
             raise Exception(f"格式化提示词失败: {str(e)}")

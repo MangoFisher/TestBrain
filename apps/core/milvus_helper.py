@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer
 from apps.knowledge.vector_store import MilvusVectorStore
 from utils.logger_manager import get_logger
 
-logger = get_logger('milvus_helper')    
+logger = get_logger(__name__)    
 
 # 初始化嵌入模型（单例模式）
 _embedding_model = None

@@ -13,7 +13,7 @@ class TestCaseGeneratorAgent:
         self.llm_service = llm_service
         self.knowledge_service = knowledge_service
         self.prompt = TestCaseGeneratorPrompt()
-        self.logger = get_logger('agent')  # 添加logger
+        self.logger = get_logger(self.__class__.__name__)  # 添加logger
     
     def generate(self, input_text: str, input_type: str = "requirement") -> List[Dict[str, Any]]:
         """生成测试用例"""
