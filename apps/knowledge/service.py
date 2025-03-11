@@ -37,7 +37,11 @@ class KnowledgeService:
         """搜索相关知识"""
         # 获取查询的嵌入向量
         query_embedding = self.embedder.get_embeddings(query)[0]
-        self.logger.info(f"查询文本: '{query}', 向量维度: {len(query_embedding)}, 前5个维度: {query_embedding[:5]}")
+        self.logger.info(
+            f"知识库查询context: '{query}'\n"
+            f"向量维度: {len(query_embedding)}\n"
+            f"前5个维度: {query_embedding[:5]}"
+        )
 
         
         # 在向量数据库中搜索
@@ -55,7 +59,6 @@ class KnowledgeService:
         Returns:
             str: 跟查询需求有关的测试用例内容，如果没有找到则返回空字符串
         """
-        self.logger.info(f"搜索知识: {query}")
         try:
             # 复用已有的search_knowledge函数
             results = self.search_knowledge(query, top_k=top_k)

@@ -3,8 +3,7 @@ import json
 import logging
 
 from ..llm.base import BaseLLMService
-from ..llm.langchain_adapter import LangChainAdapter
-from ..knowledge.service import KnowledgeService
+from ..knowledge.service import KnowledgeService 
 from ..core.models import TestCase
 from .prompts import TestCaseReviewerPrompt
 from langchain_core.messages import SystemMessage, HumanMessage

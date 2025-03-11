@@ -23,7 +23,7 @@ class TestCaseGeneratorAgent:
         
         # 获取知识上下文
         knowledge_context = self._get_knowledge_context(input_text)
-        self.logger.info(f"获取到知识库上下文: {knowledge_context}")
+        self.logger.info(f"获取到知识库上下文: \n{'='*50}\n{knowledge_context}\n{'='*50}")
         
         # 构建消息
         messages = [
@@ -62,7 +62,7 @@ class TestCaseGeneratorAgent:
             # return ""
             knowledge = self.knowledge_service.search_relevant_knowledge(input_text)
             if knowledge:
-                return f"\n相关知识：\n{knowledge}"
+                return f"{knowledge}"
         except Exception as e:
             self.logger.warning(f"获取知识上下文失败: {str(e)}")
         return ""

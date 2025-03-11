@@ -111,7 +111,6 @@ def generate(request):
                 # 生成测试用例
                 test_cases = generator_agent.generate(requirement, input_type="requirement")
                 logger.info(f"测试用例生成成功 - 生成数量: {len(test_cases)}")
-                logger.info(f"测试用例数据结构: {type(test_cases)}")
                 logger.info(f"测试用例详细内容: {json.dumps(test_cases, ensure_ascii=False, indent=2)}")
                 
                 # 直接将测试用例数据传递给模板
