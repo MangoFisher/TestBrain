@@ -1,6 +1,8 @@
 import torch
 from typing import List, Union, Dict
 from transformers import AutoTokenizer, AutoModel
+from sentence_transformers import SentenceTransformer
+
 import numpy as np
 import os
 
@@ -15,7 +17,6 @@ class BGEM3Embedder:
             model_name: 模型名称，默认为'BAAI/bge-m3'
         """
         print("正在加载BGE-M3模型...")
-        from sentence_transformers import SentenceTransformer
         self.model = SentenceTransformer(model_name)
 
         
