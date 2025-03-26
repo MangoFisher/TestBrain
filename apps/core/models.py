@@ -105,4 +105,34 @@ class KnowledgeBase(models.Model):
     
     class Meta:
         verbose_name = "知识库"
-        verbose_name_plural = "知识库" 
+        verbose_name_plural = "知识库"
+
+class FileUploadTask(models.Model):
+    """文件上传任务状态跟踪"""
+    file_name = models.CharField(max_length=255, verbose_name='文件名')
+    file_path = models.CharField(max_length=255, verbose_name='文件路径')
+    # file_type = models.CharField(max_length=255, verbose_name='文件类型')
+    status = models.CharField(
+        max_length=20, 
+        choices=[
+            ('pending', '等待处理'),
+            ('processing', '处理中'),
+            ('completed', '已完成'),
+            ('failed', '失败')
+        ],
+        default='pending',
+        verbose_name='状态'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+    error_message = models.TextField(null=True, blank=True, verbose_name='错误信息')
+    total_chunks = models.IntegerField(default=0, verbose_name='总块数')
+    processed_chunks = models.IntegerField(default=0, verbose_name='已处理块数')
+
+    class Meta:
+        verbose_name = '文件上传任务'
+        verbose_name_plural = verbose_name
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.file_name} ({self.status})" 

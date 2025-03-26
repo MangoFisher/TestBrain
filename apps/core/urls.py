@@ -27,4 +27,5 @@ urlpatterns = [
     path('api/knowledge-list/', views.knowledge_list, name='knowledge_list'),
     path('api/search-knowledge/', views.search_knowledge, name='search_knowledge'),   
     path('api/delete-test-cases/', views.delete_test_cases, name='delete_test_cases'), #删除选中的测试用例
+    path('api/upload-status/<int:task_id>/', views.get_upload_status, name='get_upload_status'),
 ] 

@@ -7,24 +7,48 @@ import numpy as np
 import os
 
 class BGEM3Embedder:
-    """BGE-M3嵌入模型本地服务 - 针对Apple Silicon优化"""
+    """BGE-M3嵌入模型本地服务"""
+    _instance = None
+    _model = None
     
-    def __init__(self, model_name: str = "BAAI/bge-m3"):
-        """
-        初始化BGE-M3嵌入模型
-        
-        Args:
-            model_name: 模型名称，默认为'BAAI/bge-m3'
-        """
-        print("正在加载BGE-M3模型...")
-        self.model = SentenceTransformer(model_name)
+    def __new__(cls, *args, **kwargs):
+        """单例模式，确保只创建一个实例"""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    def __init__(self, model_name: str = "BAAI/bge-m3", device: str = 'cpu'):
+        """初始化模型，使用单例模式避免重复加载"""
+        if self._model is None:
+            try:
+                print("正在加载BGE-M3模型...")
+                # 强制使用 CPU
+                os.environ['CUDA_VISIBLE_DEVICES'] = ''
+                os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '0'
+                
+                from sentence_transformers import SentenceTransformer
+                import torch
+                torch.device('cpu')  # 强制使用 CPU
+                
+                # 设置模型缓存目录
+                cache_dir = os.path.join(os.path.dirname(__file__), 'model_cache')
+                os.makedirs(cache_dir, exist_ok=True)
+                
+                self._model = SentenceTransformer(
+                    model_name,
+                    cache_folder=cache_dir,
+                    device='cpu'  # 强制使用 CPU
+                )
+                print("BGE-M3模型加载完成")
+            except Exception as e:
+                print(f"BGE-M3模型加载失败: {str(e)}")
+                raise
 
-        
     def get_embeddings(self, texts: Union[str, List[str]], show_progress_bar: bool = False) -> List[List[float]]:
         """获取文本的嵌入向量"""
         if isinstance(texts, str):
             texts = [texts]
-        embeddings = self.model.encode(sentences=texts, normalize_embeddings=True, show_progress_bar=show_progress_bar)
+        embeddings = self._model.encode(sentences=texts, normalize_embeddings=True, show_progress_bar=show_progress_bar)
         return embeddings.tolist()
     
     def compute_similarity(self, text1: str, text2: str) -> float:

@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 import json
 
-from .models import TestCase, TestCaseReview, KnowledgeBase
+from .models import TestCase, TestCaseReview, KnowledgeBase, FileUploadTask
 from .forms import TestCaseForm, TestCaseReviewForm, KnowledgeBaseForm
 from ..agents.generator import TestCaseGeneratorAgent
 from ..agents.reviewer import TestCaseReviewerAgent
@@ -29,6 +29,7 @@ import gc
 import xlwt
 from django.http import HttpResponse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from .tasks import process_file_upload
 
 logger = get_logger(__name__)
 
@@ -56,9 +57,11 @@ vector_store = MilvusVectorStore(
     collection_name=settings.VECTOR_DB_CONFIG['collection_name']
 )
 
-embedder = BGEM3Embedder(
-    model_name="BAAI/bge-m3"
-)
+embedder = None
+# 暂时屏蔽，不要删除
+# embedder = BGEM3Embedder(
+#     model_name="BAAI/bge-m3"
+# )
 
 knowledge_service = KnowledgeService(vector_store, embedder)
 # test_case_generator = TestCaseGeneratorAgent(llm_service, knowledge_service)
@@ -451,155 +454,96 @@ def upload_single_file(request):
     if request.method == 'GET':
         return render(request, 'upload.html')
     elif request.method == 'POST':
-        if 'single_file' in request.FILES:  # 修改这里匹配前端的 name 属性
-            uploaded_file = request.FILES['single_file']  # 修改这里匹配前端的 name 属性
-            file_path = os.path.join(settings.MEDIA_ROOT, uploaded_file.name)
+        if not 'single_file' in request.FILES:
+            return JsonResponse({
+                'success': False,
+                'error': '未接收到文件'
+            })
             
-            # 先检查文件是否存在
+        uploaded_file = request.FILES['single_file']
+        try:
+            # 1. 先检查文件是否存在
+            file_path = os.path.join(settings.MEDIA_ROOT, uploaded_file.name)
             if os.path.exists(file_path):
+                logger.info(f"文件已存在: {file_path}")
                 return JsonResponse({
                     'success': False,
                     'error': '文件已存在'
                 })
-                
-            try:
-                # 1. 接收文件
-                logger.info(f"Uploaded file: {uploaded_file}")
-                if not uploaded_file:
-                    return JsonResponse({'success': False, 'error': '未接收到文件'})
-                
-                file_categories = {
-                    "CSV": [".csv"],
-                    "E-mail": [".eml", ".msg", ".p7s"],
-                    "EPUB": [".epub"],
-                    "Excel": [".xls", ".xlsx"],
-                    "HTML": [".html"],
-                    "Image": [".bmp", ".heic", ".jpeg", ".png", ".tiff"],
-                    "Markdown": [".md"],
-                    "Org Mode": [".org"],
-                    "Open Office": [".odt"],
-                    "PDF": [".pdf"],
-                    "Plain text": [".txt"],
-                    "PowerPoint": [".ppt", ".pptx"],
-                    "reStructured Text": [".rst"],
-                    "Rich Text": [".rtf"],
-                    "TSV": [".tsv"],
-                    "Word": [".doc", ".docx"],
-                    "XML": [".xml"]
-                }
-                file_type = os.path.splitext(uploaded_file.name)[1]
-                logger.info(f"上传文件类型: {file_type}")
-                logger.info(f"上传文件名: {uploaded_file.name}")
-                
-                if not file_type:
-                    logger.error("文件没有扩展名")
-                    return JsonResponse({'success': False, 'error': '文件必须包含扩展名'})
-                
-                # 获取所有支持的文件扩展名
-                supported_extensions = [ext.lower() for exts in file_categories.values() for ext in exts]
-
-                if file_type not in supported_extensions:
-                    return JsonResponse({'success': False, 'error': '不支持的文件类型'})
-                
-                # 2. 保存临时文件
-                save_dir = 'uploads/'
-                os.makedirs(save_dir, exist_ok=True)
-                file_path = os.path.join(save_dir, f"{uploaded_file.name}")
-                with open(file_path, 'wb+') as f:
-                    for chunk in uploaded_file.chunks():
-                        f.write(chunk)
-                logger.info(f"临时文件保存成功, 文件保存路径: {file_path}")
-
-                # 3. 处理文件
-                chunks = process_singel_file(file_path)  # 获取原始数据和文本
-                if not chunks:
-                    return JsonResponse({'success': False, 'error': '文件中无有效内容'})
-
-                # 提取所有chunk.text并记录日志
-                if isinstance(chunks, list):
-                    # 直接从chunks中提取text属性
-                    text_contents = []
-                    for i, chunk in enumerate(chunks):
-                        if hasattr(chunk, 'text'):
-                            text_contents.append(str(chunk.text))
-                        else:
-                            text_contents.append(str(chunk))
-                
-                    logger.info(f"共提取了 {len(text_contents)} 个文本内容")
-                else:
-                    # 单一文本块的情况
-                    if hasattr(chunks, 'text'):
-                        text_contents = [str(chunks.text)]
-                    else:
-                        text_contents = [str(chunks)]
-                    logger.info(f"提取了单个文本内容: {text_contents[0][:100]}...")
-
-                # 直接生成所有文本内容的向量
-                logger.info("开始生成向量")
-                start_time = datetime.now()
-
-                try:
-                    # 直接为所有文本内容生成向量
-                    all_embeddings = embedder.get_embeddings(texts=text_contents, show_progress_bar=False)
-                    logger.info(f"成功生成 {len(all_embeddings)} 个向量")
-                    
-                    # 确保embeddings是列表格式
-                    embeddings_list = []
-                    for emb in all_embeddings:
-                        if hasattr(emb, 'tolist'):
-                            emb = emb.tolist()
-                        embeddings_list.append(emb)
-                    
-                    # 准备插入数据
-                    data_to_insert = []
-                    for i in range(len(text_contents)):
-                        item = {
-                            "embedding": embeddings_list[i],  # 单个embedding向量
-                            "content": text_contents[i],      # 文本内容
-                            "metadata": '{}',                 # 元数据
-                            "source": file_path,              # 来源
-                            "doc_type": file_type,            # 文档类型
-                            "chunk_id": f"{hashlib.md5(os.path.basename(file_path).encode()).hexdigest()[:10]}_{i:04d}",  # 块ID
-                            "upload_time": datetime.now().isoformat()  # 上传时间
-                        }
-                        data_to_insert.append(item)
-                    
-                    # 插入数据到Milvus
-                    logger.info(f"开始往milvus中插入 {len(data_to_insert)} 条数据")
-                    vector_store.add_data(data_to_insert)
-                    logger.info("数据插入完成")
-                    
-                    total_time = (datetime.now() - start_time).total_seconds()
-                    logger.info(f"向量生成和插入完成，总耗时: {total_time:.2f} 秒")
-                    
-                    return JsonResponse({
-                        'success': True, 
-                        'count': len(text_contents),
-                        'message': f'成功导入文件到知识库'
-                    })
-                    
-                except Exception as e:
-                    logger.error(f"生成或插入向量时出错: {str(e)}", exc_info=True)
-                    return JsonResponse({
-                        'success': False, 
-                        'error': str(e)
-                    })
-                
-            except Exception as e:
-                logger.error(f"处理上传文件时出错: {str(e)}", exc_info=True)
+            
+            # 2. 检查文件扩展名
+            file_type = os.path.splitext(uploaded_file.name)[1].lower()
+            logger.info(f"上传文件类型: {file_type}")
+            logger.info(f"上传文件名: {uploaded_file.name}")
+            
+            if not file_type:
+                logger.error("文件没有扩展名")
                 return JsonResponse({
-                    'success': False, 
-                    'error': str(e)
+                    'success': False,
+                    'error': '文件必须包含扩展名'
                 })
-            finally:
-                # 清理临时文件
-                if os.path.exists(file_path):
-                    pass
-                    # os.remove(file_path)
-        else:
+            
+            # 3. 检查是否支持该文件类型
+            file_categories = {
+                "CSV": [".csv"],
+                "E-mail": [".eml", ".msg", ".p7s"],
+                "EPUB": [".epub"],
+                "Excel": [".xls", ".xlsx"],
+                "HTML": [".html"],
+                "Image": [".bmp", ".heic", ".jpeg", ".png", ".tiff"],
+                "Markdown": [".md"],
+                "Org Mode": [".org"],
+                "Open Office": [".odt"],
+                "PDF": [".pdf"],
+                "Plain text": [".txt"],
+                "PowerPoint": [".ppt", ".pptx"],
+                "reStructured Text": [".rst"],
+                "Rich Text": [".rtf"],
+                "TSV": [".tsv"],
+                "Word": [".doc", ".docx"],
+                "XML": [".xml"]
+            }
+            
+            supported_extensions = [ext.lower() for exts in file_categories.values() for ext in exts]
+            if file_type not in supported_extensions:
+                logger.error(f"不支持的文件类型: {file_type}")
+                return JsonResponse({
+                    'success': False,
+                    'error': '不支持的文件类型'
+                })
+            
+            # 4. 确保目录存在
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # 5. 保存文件
+            with open(file_path, 'wb+') as f:
+                for chunk in uploaded_file.chunks():
+                    f.write(chunk)
+            logger.info(f"文件保存成功: {file_path}")
+            
+            # 6. 创建任务记录
+            task = FileUploadTask.objects.create(
+                file_name=uploaded_file.name,
+                file_path=file_path,
+                status='pending'
+            )
+            logger.info(f"创建上传任务: {task.id}")
+            
+            # 7. 启动异步任务
+            process_file_upload.delay(task.id)
+            logger.info(f"启动异步处理任务: {task.id}")
+            
+            return JsonResponse({
+                'success': True,
+                'task_id': task.id,
+                'message': '文件上传成功，正在后台处理'
+            })
+            
+        except Exception as e:
+            logger.error(f"文件上传失败: {str(e)}", exc_info=True)
             return JsonResponse({
                 'success': False,
-                'error': '未接收到文件'
+                'error': f'文件上传失败: {str(e)}'
             })
     
     return JsonResponse({
@@ -607,6 +551,33 @@ def upload_single_file(request):
         'error': '不支持的请求方法'
     })
 
+def get_upload_status(request, task_id):
+    """获取上传任务状态"""
+    try:
+        task = FileUploadTask.objects.get(id=task_id)
+        
+        # 计算进度
+        progress = (task.processed_chunks / task.total_chunks 
+                   if task.total_chunks > 0 else 0)
+        
+        return JsonResponse({
+            'status': task.status,
+            'progress': progress,
+            'error': task.error_message,
+            'file_name': task.file_name
+        })
+        
+    except FileUploadTask.DoesNotExist:
+        logger.error(f"任务不存在: {task_id}")
+        return JsonResponse({
+            'error': '任务不存在'
+        }, status=404)
+        
+    except Exception as e:
+        logger.error(f"获取任务状态失败: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'error': f'获取任务状态失败: {str(e)}'
+        }, status=500)
 
 def case_review_detail(request):
     return render(request, 'case_review_detail.html')

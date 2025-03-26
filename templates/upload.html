@@ -54,7 +54,39 @@
         margin-top: 15px;
         color: #28a745;
         font-weight: 500;
-        display: none;  /* 初始状态隐藏 */
+        display: none;
+    }
+
+    .progress {
+        margin-top: 20px;
+        display: none;
+    }
+    
+    .task-status {
+        margin-top: 10px;
+        padding: 10px;
+        border-radius: 4px;
+        display: none;
+    }
+    
+    .task-status.pending {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .task-status.processing {
+        background-color: #cce5ff;
+        color: #004085;
+    }
+    
+    .task-status.completed {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .task-status.failed {
+        background-color: #f8d7da;
+        color: #721c24;
     }
 </style>
 {% endblock %}
@@ -73,7 +105,12 @@
                 拖拽文件到此区域或点击选择文件
             </div>
             <div id="selected-file" class="selected-file"></div>
-            <div id="uploadStatus" style="margin-top: 10px; color: #666;"></div>
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar" 
+                     style="width: 0%">0%</div>
+            </div>
+            <div class="task-status"></div>
         </div>
         <div class="submit-container">
             <button type="submit" class="btn btn-success submit-button" id="submitBtn">上传并存储到知识库</button>
@@ -82,6 +119,7 @@
 </div>
 
 <script>
+// 更新文件名显示
 function updateFileName(input) {
     const selectedFile = document.getElementById('selected-file');
     if (input.files && input.files[0]) {
@@ -93,24 +131,85 @@ function updateFileName(input) {
     }
 }
 
+// 轮询任务状态
+async function pollTaskStatus(taskId) {
+    const progressBar = document.querySelector('.progress-bar');
+    const progressDiv = document.querySelector('.progress');
+    const statusDiv = document.querySelector('.task-status');
+    
+    while (true) {
+        try {
+            const response = await fetch(`/api/upload-status/${taskId}/`);
+            const result = await response.json();
+            
+            if (result.error) {
+                throw new Error(result.error);
+            }
+            
+            // 更新进度条
+            if (result.progress !== undefined) {
+                const progress = Math.round(result.progress * 100);
+                progressBar.style.width = `${progress}%`;
+                progressBar.textContent = `${progress}%`;
+            }
+            
+            // 更新状态显示
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'task-status ' + result.status;
+            
+            switch (result.status) {
+                case 'pending':
+                    statusDiv.textContent = '任务等待处理...';
+                    break;
+                case 'processing':
+                    statusDiv.textContent = '正在处理文件...';
+                    progressDiv.style.display = 'block';
+                    break;
+                case 'completed':
+                    statusDiv.textContent = '文件处理完成！';
+                    progressDiv.style.display = 'none';
+                    return;
+                case 'failed':
+                    statusDiv.textContent = `处理失败: ${result.error || '未知错误'}`;
+                    progressDiv.style.display = 'none';
+                    return;
+                default:
+                    statusDiv.textContent = '未知状态';
+            }
+            
+            // 等待2秒后再次查询
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+        } catch (error) {
+            statusDiv.className = 'task-status failed';
+            statusDiv.textContent = `状态查询失败: ${error.message}`;
+            progressDiv.style.display = 'none';
+            return;
+        }
+    }
+}
+
+// 处理表单提交
 async function handleSubmit(event) {
     event.preventDefault();
     
     const form = event.target;
     const fileInput = form.querySelector('input[type="file"]');
     const submitBtn = document.getElementById('submitBtn');
-    const statusDiv = document.getElementById('uploadStatus');
+    const statusDiv = document.querySelector('.task-status');
+    const progressDiv = document.querySelector('.progress');
     
     if (!fileInput.files || !fileInput.files[0]) {
+        statusDiv.className = 'task-status failed';
+        statusDiv.style.display = 'block';
         statusDiv.textContent = '请先选择要上传的文件';
-        statusDiv.style.color = '#dc3545';
         return false;
     }
 
     submitBtn.disabled = true;
-    statusDiv.textContent = '文件上传中，请稍候...';
-    statusDiv.style.color = '#dc3545';
-    statusDiv.style.fontWeight = 'bold';
+    statusDiv.className = 'task-status processing';
+    statusDiv.style.display = 'block';
+    statusDiv.textContent = '正在上传文件...';
 
     try {
         const formData = new FormData(form);
@@ -125,17 +224,16 @@ async function handleSubmit(event) {
         const result = await response.json();
 
         if (result.success) {
-            statusDiv.textContent = `上传成功！成功导入 ${result.count} 条向量数据`;
-            statusDiv.style.color = '#28a745';
-            fileInput.value = '';
-            document.getElementById('selected-file').style.display = 'none';
+            // 开始轮询任务状态
+            progressDiv.style.display = 'block';
+            pollTaskStatus(result.task_id);
         } else {
+            statusDiv.className = 'task-status failed';
             statusDiv.textContent = result.error || '上传失败，请重试';
-            statusDiv.style.color = '#dc3545';
         }
     } catch (error) {
+        statusDiv.className = 'task-status failed';
         statusDiv.textContent = '上传过程中发生错误，请重试';
-        statusDiv.style.color = '#dc3545';
     } finally {
         submitBtn.disabled = false;
     }
