@@ -7,6 +7,7 @@ from ..knowledge.service import KnowledgeService
 from .prompts import PrdAnalyserPrompt
 from langchain_core.messages import SystemMessage, HumanMessage
 from utils.logger_manager import get_logger
+from .tasks import llm_invoke
 
 class PrdAnalyserAgent:
     """PRD分析Agent，用于从PRD文档中提取测试点和测试场景"""
@@ -39,9 +40,21 @@ class PrdAnalyserAgent:
             
             self.logger.info(f"构建后的PRD分析提示词: \n{'='*50}\n{messages}\n{'='*50}")
             
-            # 调用LLM服务
-            response = self.llm_service.invoke(messages)
-            result = response.content
+            # 使用LangChain的序列化方法
+            messages_dicts = [msg.dict() for msg in messages]
+            
+            # 序列化LLM服务实例
+            llm_service_dict = self.llm_service.to_dict()
+            self.logger.info("LLM服务实例序列化成功")
+            
+            # 异步调用LLM服务
+            result = llm_invoke.delay(
+                llm_service_dict=llm_service_dict,
+                messages=messages_dicts
+            ).get()
+            
+            if not result:
+                raise ValueError("LLM服务返回空响应")
             
             # 解析JSON结果
             try:
