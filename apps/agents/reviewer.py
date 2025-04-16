@@ -8,6 +8,7 @@ from ..core.models import TestCase
 from .prompts import TestCaseReviewerPrompt
 from langchain_core.messages import SystemMessage, HumanMessage
 from utils.logger_manager import get_logger
+from .tasks import llm_invoke
 
 
 
@@ -37,8 +38,21 @@ class TestCaseReviewerAgent:
             
             self.logger.info(f"构建后的评审提示词: \n{'='*50}\n{messages}\n{'='*50}")
             
-            # 调用LLM服务
-            result = self.llm_service.invoke(messages)  # 使用 invoke 方法替代 chat
+            # 使用LangChain的序列化方法
+            messages_dicts = [msg.dict() for msg in messages]
+            
+            # 序列化LLM服务实例
+            llm_service_dict = self.llm_service.to_dict()
+            self.logger.info("LLM服务实例序列化成功")
+            
+            # 异步调用LLM服务
+            result = llm_invoke.delay(
+                llm_service_dict=llm_service_dict,
+                messages=messages_dicts
+            ).get()
+            
+            if not result:
+                raise ValueError("LLM服务返回空响应")
             
             return result
             
