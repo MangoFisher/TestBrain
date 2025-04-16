@@ -9,73 +9,52 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from .callbacks import LoggingCallbackHandler
-from .deepseek import DeepSeekChatModel
-from .qwen import QwenChatModel
-
 
 # 加载.env文件中的环境变量
 load_dotenv()
 
-class BaseLLMService(BaseChatModel):
-    """基础LLM服务类"""
-    
-    def __init__(self):
-        # 使用统一日志管理器获取日志记录器
-        self.logger = get_logger(self.__class__.__name__)
+class BaseLLMService(ABC):
+    """LLM服务基类"""
     
     @abstractmethod
-    def generate(self, prompt: str, **kwargs) -> str:
-        """生成文本响应"""
+    def invoke(self, messages: List[BaseMessage]) -> Any:
+        """调用LLM服务"""
         pass
     
-    @abstractmethod
-    def generate_with_history(self, 
-                             messages: List[Dict[str, str]], 
-                             **kwargs) -> str:
-        """基于对话历史生成响应"""
-        pass
-    
-    def _log_request(self, method_name: str, prompt_or_messages, **kwargs):
-        """记录请求日志"""
-        if isinstance(prompt_or_messages, str):
-            # 对于单个prompt，只记录前100个字符
-            prompt_preview = prompt_or_messages[:100] + "..." if len(prompt_or_messages) > 100 else prompt_or_messages
-            self.logger.info(f"开始调用 {method_name}: prompt='{prompt_preview}'")
-        else:
-            # 对于消息列表，记录消息数量和最后一条消息
-            last_msg = prompt_or_messages[-1] if prompt_or_messages else {}
-            last_content = last_msg.get('content', '')
-            content_preview = last_content[:100] + "..." if len(last_content) > 100 else last_content
-            self.logger.info(f"开始调用 {method_name}: 消息数量={len(prompt_or_messages)}, 最后消息='{content_preview}'")
+    def to_dict(self) -> Dict[str, Any]:
+        """将LLM服务实例转换为可序列化的字典
         
-        # 记录关键参数
-        important_params = {k: v for k, v in kwargs.items() if k in ['model', 'temperature', 'max_tokens']}
-        if important_params:
-            self.logger.info(f"调用参数: {important_params}")
+        Returns:
+            包含所有必要配置的字典
+        """
+        return {
+            'class_path': f"{self.__class__.__module__}.{self.__class__.__name__}",
+            'config': {
+                key: getattr(self, key)
+                for key in ['api_base', 'api_key', 'model', 'temperature', 'max_tokens']
+                if hasattr(self, key)
+            }
+        }
     
-    def _log_response(self, method_name: str, response: str, elapsed_time: float):
-        """记录响应日志"""
-        response_preview = response[:100] + "..." if len(response) > 100 else response
-        self.logger.info(f"调用成功 {method_name}: 耗时={elapsed_time:.2f}秒, 响应='{response_preview}'")
-    
-    def _log_error(self, method_name: str, error: Exception, elapsed_time: float):
-        """记录错误日志"""
-        self.logger.error(f"调用失败 {method_name}: 耗时={elapsed_time:.2f}秒, 错误={str(error)}", exc_info=True)
-
-    def _generate(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
-        **kwargs: Any,
-    ) -> str:
-        """实现 BaseChatModel 要求的方法"""
-        raise NotImplementedError()
-    
-    @property
-    def _llm_type(self) -> str:
-        """返回LLM类型"""
-        return "base_llm_service"
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'BaseLLMService':
+        """从字典创建LLM服务实例
+        
+        Args:
+            data: 包含类路径和配置的字典
+            
+        Returns:
+            LLM服务实例
+        """
+        from importlib import import_module
+        
+        # 动态导入模型类
+        module_path, class_name = data['class_path'].rsplit('.', 1)
+        module = import_module(module_path)
+        ModelClass = getattr(module, class_name)
+        
+        # 创建实例
+        return ModelClass(**data['config'])
 
 class LLMServiceFactory:
     """大模型服务工厂"""
@@ -117,9 +96,11 @@ class LLMServiceFactory:
         
         # 根据提供商创建相应的服务实例
         if provider.lower() == "deepseek":
+            # 延迟导入，避免循环依赖
             from .deepseek import DeepSeekChatModel
             return DeepSeekChatModel(**merged_config)
         elif provider.lower() == "qwen":
+            # 延迟导入，避免循环依赖
             from .qwen import QwenChatModel
             return QwenChatModel(**merged_config)
         elif provider.lower() == "openai":
