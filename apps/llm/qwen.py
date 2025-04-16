@@ -13,6 +13,7 @@ class QwenChatModel(ChatOpenAI, BaseLLMService):
         api_key: str = None,
         api_base: str = None,
         model: str = "qwen-max",
+        max_tokens: int = 4096,
         **kwargs
     ):
         # 设置默认的API基础URL
@@ -26,12 +27,19 @@ class QwenChatModel(ChatOpenAI, BaseLLMService):
                 "or pass it directly."
             )
         
+        # 验证并限制max_tokens的范围
+        if max_tokens > 8192:
+            max_tokens = 8192
+        elif max_tokens < 1:
+            max_tokens = 1
+            
         # 设置为OpenAI格式的API密钥
         os.environ["OPENAI_API_KEY"] = api_key
         
         super().__init__(
             model_name=model,
             openai_api_base=api_base,
+            max_tokens=max_tokens,
             **kwargs
         )
     
