@@ -1,7 +1,11 @@
+from typing import Any, List, Optional, Dict
+from langchain_core.messages import BaseMessage
+from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_community.chat_models import ChatOpenAI
+from .base import BaseLLMService
 import os
 
-class QwenChatModel(ChatOpenAI):
+class QwenChatModel(ChatOpenAI, BaseLLMService):
     """通义千问聊天模型"""
     
     def __init__(
@@ -30,3 +34,21 @@ class QwenChatModel(ChatOpenAI):
             openai_api_base=api_base,
             **kwargs
         )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """将LLM服务实例转换为可序列化的字典"""
+        return {
+            'class_path': f"{self.__class__.__module__}.{self.__class__.__name__}",
+            'config': {
+                'api_base': self.openai_api_base,
+                'api_key': self.openai_api_key,
+                'model': self.model_name,
+                'temperature': self.temperature,
+                'max_tokens': self.max_tokens
+            }
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'QwenChatModel':
+        """从字典创建实例"""
+        return cls(**data['config'])
