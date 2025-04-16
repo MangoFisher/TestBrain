@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'apps.llm',
     'apps.agents',
     'apps.knowledge',
+    'django_celery_results',
 ]
 
 MIDDLEWARE = [
@@ -173,4 +174,31 @@ EMBEDDING_CONFIG = {
 # Hugging Face 的tokenizers库使用了多进程机制;
 # 在自己的逻辑中使用时，需要注意在进程fork之前不要使用tokenizers库,否则可能会引起死锁
 # 在Django启动时设置环境变量为false,禁止tokenizers库使用多进程
-os.environ["TOKENIZERS_PARALLELISM"] = "false" 
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+# Celery Configuration
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30分钟超时限制
+
+# Redis Configuration
+REDIS_HOST = 'localhost'
+REDIS_PORT = '6379'
+REDIS_DB = '0'
+
+# Celery Broker and Backend Settings (Redis)
+CELERY_BROKER_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
+CELERY_RESULT_BACKEND = f'redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
+
+# Celery 序列化设置
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+
+# Celery Task 结果设置
+CELERY_TASK_IGNORE_RESULT = False  # 需要存储任务结果
+CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True  # 即使忽略结果也存储错误
+
+# Celery Worker 设置
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 100  # 每个worker执行100个任务后自动重启
+CELERY_WORKER_PREFETCH_MULTIPLIER = 4  # worker预取任务数 

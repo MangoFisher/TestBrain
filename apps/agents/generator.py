@@ -5,7 +5,9 @@ from ..llm.base import BaseLLMService
 from ..knowledge.service import KnowledgeService
 from .prompts import TestCaseGeneratorPrompt
 from utils.logger_manager import get_logger
+from .tasks import llm_invoke
 import re
+
 class TestCaseGeneratorAgent:
     """测试用例生成Agent"""
     
@@ -16,8 +18,8 @@ class TestCaseGeneratorAgent:
         self.case_count = case_count
         self.knowledge_service = knowledge_service
         self.prompt = TestCaseGeneratorPrompt()
-        self.logger = get_logger(self.__class__.__name__)  # 添加logger
-    
+        self.logger = get_logger(self.__class__.__name__)
+
     def generate(self, input_text: str, input_type: str = "requirement") -> List[Dict[str, Any]]:
         """生成测试用例"""
         self.logger.info(f"开始生成测试用例,进入生成测试用例的TestCaseGeneratorAgent")
@@ -44,8 +46,22 @@ class TestCaseGeneratorAgent:
         
         # 调用LLM服务
         try:
-            response = self.llm_service.invoke(messages)
-            result = response.content
+            # 使用LangChain的序列化方法
+            messages_dicts = [msg.dict() for msg in messages]
+            
+            # 序列化LLM服务实例
+            llm_service_dict = self.llm_service.to_dict()
+            self.logger.info("LLM服务实例序列化成功")
+            
+            # 异步调用LLM服务
+            result = llm_invoke.delay(
+                llm_service_dict=llm_service_dict,
+                messages=messages_dicts
+            ).get()
+            
+            if not result:
+                raise ValueError("LLM服务返回空响应")
+                
             self.logger.info(f"LLM原始响应: \n{'='*50}\n{result}\n{'='*50}")
             
             # 尝试提取JSON部分
@@ -61,7 +77,9 @@ class TestCaseGeneratorAgent:
             return valid_test_cases
             
         except Exception as e:
-            raise ValueError(f"无法解析生成的测试用例: {str(e)}\n原始响应: {result}")
+            error_msg = f"生成测试用例失败: {str(e)}"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
     
     def _get_knowledge_context(self, input_text: str) -> str:
         """获取相关知识上下文"""
