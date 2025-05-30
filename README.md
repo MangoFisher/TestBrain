@@ -98,3 +98,5 @@ http://127.0.0.1:8000/
 
 8.知识库文件上传
 --/videos/知识库文档上传.mp4
+
+<img src="videos/赞赏码.jpg" alt="请我喝杯咖啡" title="请我喝杯咖啡" width="400" height="400">
