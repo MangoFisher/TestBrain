@@ -196,7 +196,7 @@ api_test_case_generator:
     
     重要提示：
     1. 你必须严格按照JSON格式返回数据
-    2. 返回的JSON必须是一个完整的测试用例对象
+    2. 返回的JSON必须是一个包含{case_count}个测试用例对象的数组
     3. 不要在JSON数据之前或之后添加任何额外的解释文本
     4. 确保所有字符串使用双引号，不要使用单引号
     5. 严格按照提供的模板结构生成，不要遗漏任何字段
@@ -246,7 +246,7 @@ api_test_case_generator:
     - 请求方法：{method}
     - 请求路径：{path}
     - 测试用例优先级：{priority}
-    - 生成第几个用例：{case_number}
+    - 需要生成测试用例数量：{case_count}条
 
     ## 请求结构
     {request_structure}

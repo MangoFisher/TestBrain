@@ -109,12 +109,13 @@ class PromptTemplateManager:
             'role': config['role'],
             'capabilities': config['capabilities'],
             'api_analysis_focus': ', '.join(config['api_analysis_focus']),
-            'template_understanding': '\n'.join(config['template_understanding'])
+            'template_understanding': '\n'.join(config['template_understanding']),
+            'case_count': '{case_count}'
         }
         
         # 创建系统消息模板
         system_message_prompt = SystemMessagePromptTemplate.from_template(
-            config['system_template'].format(**system_vars)
+            config['system_template'].format(**system_vars)  # 直接格式化模板
         )
         
         # 创建人类消息模板
@@ -233,13 +234,13 @@ class APITestCaseGeneratorPrompt:
         self.prompt_template = self.prompt_manager.get_api_test_case_generator_prompt()
     
     def format_messages(self, api_info: Dict[str, Any], priority: str, 
-                       case_number: int, test_case_template: str) -> list:
+                       case_count: int, test_case_template: str) -> list:
         """格式化消息
         
         Args:
             api_info: API接口信息
             priority: 测试用例优先级
-            case_number: 生成第几个用例
+            case_count: 生成测试用例数量
             test_case_template: 测试用例结构模板
             
         Returns:
@@ -250,7 +251,7 @@ class APITestCaseGeneratorPrompt:
             method=api_info.get('method', ''),
             path=api_info.get('path', ''),
             priority=priority,
-            case_number=case_number,
+            case_count=case_count,
             request_structure=self._format_request_structure(api_info),
             response_structure=self._format_response_structure(api_info),
             test_case_template=test_case_template

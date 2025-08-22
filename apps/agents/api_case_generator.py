@@ -35,28 +35,30 @@ class APITestCaseGeneratorAgent:
             with open(template_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
     
-    def _generate_single_test_case(self, api_info: Dict[str, Any], 
-                                  priority: str, case_number: int) -> Optional[Dict[str, Any]]:
-        """生成单个测试用例"""
+    
+    
+    def _generate_multiple_test_cases(self, api_info: Dict[str, Any], 
+                                      priority: str, count: int) -> Optional[List[Dict[str, Any]]]:
+        """一次生成多条测试用例（单次LLM调用返回数组）"""
         import threading
         thread_id = threading.current_thread().ident
-        
         try:
-            # 格式化提示词
+            # 基于现有提示词，追加一次性生成多条的说明
             messages = self.prompt.format_messages(
                 api_info=api_info,
                 priority=priority,
-                case_number=case_number,
+                case_count=count,
                 test_case_template=json.dumps(self.template, ensure_ascii=False, indent=2)
             )
-            # 简单打印提示词内容（调用大模型前）
+
+            # 打印完整提示词
             try:
                 prompt_text = "\n\n".join([getattr(m, 'content', str(m)) for m in messages])
-                logger.info(f"[Thread-{thread_id}] [LLM Prompt] API={api_info.get('name', '')} Case={case_number}\n{prompt_text}")
-            except Exception as _:
+                logger.info(f"[Thread-{thread_id}] [LLM Prompt-MULTI] API={api_info.get('name', '')} Count={count}\n{prompt_text}")
+            except Exception:
                 pass
-            
-            # 调用大模型（不做兜底重试）
+
+            # 单次调用生成多条
             if hasattr(self.llm, 'generate_with_history'):
                 response = self.llm.generate_with_history(messages)
             else:
@@ -75,38 +77,44 @@ class APITestCaseGeneratorAgent:
                         langchain_messages.append(msg)
                 invoke_result = self.llm.invoke(langchain_messages)
                 response = getattr(invoke_result, 'content', invoke_result)
-            
-            # 解析响应
-            test_case = self._parse_response_to_test_case(response)
-            if not test_case:
+
+            cases = self._parse_response_to_test_cases(response)
+            if cases is None:
                 return None
-            
-            # 后处理：填充固定值、生成断言等
-            test_case = self._post_process_test_case(test_case, api_info, priority)
-            
-            return test_case
-            
+
+            # 后处理
+            processed: List[Dict[str, Any]] = []
+            for case in cases:
+                try:
+                    processed.append(self._post_process_test_case(case, api_info, priority))
+                except Exception as e:
+                    logger.error(f"[Thread-{thread_id}] 多用例后处理失败: {e}")
+            return processed
         except Exception as e:
-            logger.error(f"[Thread-{thread_id}] 生成测试用例失败: {e}")
+            logger.error(f"[Thread-{thread_id}] 生成多条测试用例失败: {e}")
             return None
+
     
-    def _parse_response_to_test_case(self, response: Any) -> Optional[Dict[str, Any]]:
-        """解析大模型响应为测试用例结构"""
+
+    def _parse_response_to_test_cases(self, response: Any) -> Optional[List[Dict[str, Any]]]:
+        """解析大模型响应为测试用例列表（支持数组或单对象容错）"""
         try:
-            # 归一化为字符串
             if not isinstance(response, str):
                 response = getattr(response, 'content', str(response))
-            # 移除可能的markdown标记
             clean_response = response.strip()
             if clean_response.startswith('```json'):
                 clean_response = clean_response[7:]
             if clean_response.endswith('```'):
                 clean_response = clean_response[:-3]
-            
             clean_response = clean_response.strip()
-            return json.loads(clean_response)
+            parsed = json.loads(clean_response)
+            if isinstance(parsed, list):
+                return [p for p in parsed if isinstance(p, dict)]
+            if isinstance(parsed, dict):
+                return [parsed]
+            return None
         except json.JSONDecodeError as e:
-            logger.error(f"解析大模型响应失败: {e}")
+            logger.error(f"解析多用例响应失败: {e}")
             return None
     
     def _post_process_test_case(self, test_case: Dict[str, Any], 
@@ -192,24 +200,20 @@ class APITestCaseGeneratorAgent:
             results_by_path: Dict[str, List[Dict[str, Any]]] = {p: [] for p in valid_paths}
 
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                future_to_key = {}
+                future_to_path = {}
                 for api_path in valid_paths:
                     api_def = path_to_api[api_path]
-                    for case_num in range(1, count_per_api + 1):
-                        fut = executor.submit(self._generate_single_test_case, api_def, priority, case_num)
-                        future_to_key[fut] = (api_path, case_num, api_def.get('name', ''))
+                    fut = executor.submit(self._generate_cases_for_single_api, api_def, priority, count_per_api)
+                    future_to_path[fut] = (api_path, api_def.get('name', ''))
 
-                for fut in as_completed(future_to_key):
-                    api_path, case_num, api_name = future_to_key[fut]
+                for fut in as_completed(future_to_path):
+                    api_path, api_name = future_to_path[fut]
                     try:
-                        test_case = fut.result()
-                        if test_case:
-                            results_by_path[api_path].append(test_case)
-                            logger.info(f"生成完成: {api_name} - 用例{case_num}")
-                        else:
-                            logger.warning(f"生成失败: {api_name} - 用例{case_num}")
+                        cases = fut.result() or []
+                        results_by_path[api_path].extend(cases)
+                        logger.info(f"接口生成完成: {api_name} - 新增用例 {len(cases)} 条")
                     except Exception as e:
-                        logger.error(f"生成异常: {api_name} - 用例{case_num}: {e}")
+                        logger.error(f"接口生成异常: {api_name}: {e}")
 
             # 主线程合并结果到 api_definitions
             total_cases = 0
@@ -233,6 +237,19 @@ class APITestCaseGeneratorAgent:
                 'success': False,
                 'error': str(e)
             }
+
+    def _generate_cases_for_single_api(self, api_def: Dict[str, Any], priority: str, count_per_api: int) -> List[Dict[str, Any]]:
+        """为单个接口一次性生成多条测试用例（按接口并发，单次LLM调用）"""
+        import threading
+        thread_id = threading.current_thread().ident
+        api_name = api_def.get('name', '')
+        try:
+            cases = self._generate_multiple_test_cases(api_def, priority, count_per_api) or []
+            logger.info(f"[Thread-{thread_id}] 接口生成完成: {api_name} - 新增用例 {len(cases)} 条")
+            return cases
+        except Exception as e:
+            logger.error(f"[Thread-{thread_id}] 接口多用例生成异常: {api_name}: {e}")
+            return []
 
     def _get_default_assertion(self):
         """获取默认断言"""
