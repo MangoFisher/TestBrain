@@ -1,0 +1,166 @@
+{
+    "id": "DEFAULT:null",
+    "name": "GENERATE:api_info.name + '_' + 测试点描述",
+    "priority": "USER_SET:priority",
+    "num": "DEFAULT:null",
+    "status": "DEFAULT:DONE",
+    "lastReportStatus": "DEFAULT:null", 
+    "lastReportId": "DEFAULT:null",
+    "projectId": "DEFAULT:null",
+    "apiDefinitionId": "DEFAULT:null",
+    "apiDefinitionNum": "DEFAULT:null",
+    "apiDefinitionName": "DEFAULT:null",
+    "environmentId": "DEFAULT:null",
+    "createTime": "DEFAULT:null",
+    "createUser": "DEFAULT:null",
+    "updateTime": "DEFAULT:null",
+    "updateUser": "DEFAULT:null",
+    "deleteTime": "DEFAULT:null",
+    "deleteUser": "DEFAULT:null",
+    "follow": "DEFAULT:null",
+    "method": "DEFAULT:null",
+    "path": "DEFAULT:null",
+    "environmentName": "DEFAULT:null",
+    "createName": "DEFAULT:null",
+    "updateName": "DEFAULT:null",
+    "deleteName": "DEFAULT:null",
+    "tags": "DEFAULT:['TestBrain']",
+    "passRate": "DEFAULT:NONE",
+    "request": {
+      "polymorphicName": "DEFAULT:MsHTTPElement",
+      "stepId": "DEFAULT:null",
+      "resourceId": "DEFAULT:null",
+      "projectId": "DEFAULT:null",
+      "name": "FIXED:api_info.name",
+      "enable": "DEFAULT:true",
+      "children": [{
+        "polymorphicName": "DEFAULT:MsCommonElement",
+        "stepId": "DEFAULT:null",
+        "resourceId": "DEFAULT:null",
+        "projectId": "DEFAULT:null",
+        "name": "DEFAULT:null",
+        "enable": "DEFAULT:true",
+        "children": "DEFAULT:[]",
+        "parent": "DEFAULT:null",
+        "csvIds": "DEFAULT:null",
+        "preProcessorConfig": {
+          "enableGlobal": "DEFAULT:true",
+          "processors": "DEFAULT:[]"
+        },
+        "postProcessorConfig": {
+          "enableGlobal": "DEFAULT:true",
+          "processors": "DEFAULT:[]"
+        },
+        "assertionConfig": {
+          "enableGlobal": "DEFAULT:true",
+          "assertions": [
+            {
+              "assertionType": "RESPONSE_CODE",
+              "enable": "DEFAULT:true",
+              "name": "状态码",
+              "id": "GENERATE:current_timestamp", //TODO:合法的json文件中是有取值的，待确认
+              "projectId": "DEFAULT:null",
+              "condition": "EQUALS",
+              "expectedValue": "200"
+            },
+            {
+              "assertionType": "RESPONSE_HEADER",
+              "enable": "DEFAULT:true",
+              "name": "响应头",
+              "id": "GENERATE:current_timestamp", 
+              "projectId": "DEFAULT:null",
+              "assertions": [
+                {
+                  "enable": "DEFAULT:true",
+                  "header": "Content-Type",
+                  "condition": "EQUALS",
+                  "expectedValue": "application/json"
+                }
+              ]
+            },
+            {
+              "assertionType": "RESPONSE_BODY",
+              "enable": "DEFAULT:true",
+              "name": "响应体",
+              "id": "GENERATE:current_timestamp",
+              "projectId": "DEFAULT:null",
+              "assertionBodyType": "JSON_PATH",
+              "jsonPathAssertion": {
+                "assertions": [
+                  {
+                    "enable": "DEFAULT:true",
+                    "expression": "GENERATE:json_path_expression",
+                    "condition": "EQUALS",
+                    "expectedValue": "GENERATE:expected_value",
+                    "valid": "DEFAULT:true"
+                  }
+                ]
+              },
+              "xpathAssertion": {
+                "responseFormat": "XML",
+                "assertions": []
+              },
+              "documentAssertion": "DEFAULT:null",
+              "regexAssertion": {
+                "assertions": []
+              },
+              "bodyAssertionClassByType": "io.metersphere.project.api.assertion.body.MsJSONPathAssertion",
+              "bodyAssertionDataByType": {
+                "assertions": [
+                  {
+                    "enable": "DEFAULT:true",
+                    "expression": "GENERATE:json_path_expression",
+                    "condition": "EQUALS",
+                    "expectedValue": "GENERATE:expected_value",
+                    "valid": "DEFAULT:true"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }],
+      "parent": "DEFAULT:null",
+      "csvIds": "DEFAULT:null",
+      "customizeRequest": "DEFAULT:false",
+      "customizeRequestEnvEnable": "DEFAULT:false",
+      "path": "FIXED:api_info.path",
+      "method": "FIXED:api_info.method",
+      "body": "FIXED:api_info.request.body",  
+      "headers": "FIXED:api_info.request.headers",  
+      "rest": "DEFAULT:[]",
+      "query": "FIXED:api_info.request.query",
+      "otherConfig": {
+					"connectTimeout": "DEFAULT:60000",
+					"responseTimeout": "DEFAULT:60000",
+					"certificateAlias": "DEFAULT:null",
+					"followRedirects": "DEFAULT:true",
+					"autoRedirects": "DEFAULT:false"
+				},
+				"authConfig": {
+					"authType": "DEFAULT:NONE",
+					"basicAuth": {
+						"userName": "DEFAULT:null",
+						"password": "DEFAULT:null",
+						"valid": "DEFAULT:false"
+					},
+					"digestAuth": {
+						"userName": "DEFAULT:null",
+						"password": "DEFAULT:null",
+						"valid": "DEFAULT:false"
+					},
+					"httpauthValid": "DEFAULT:false"
+				},
+      "moduleId": "DEFAULT:null",
+      "num": "DEFAULT:null",
+      "mockNum": "DEFAULT:null"
+    },
+    "modulePath": "DEFAULT:null",
+    "moduleId": "DEFAULT:null",
+    "protocol": "DEFAULT:null",
+    "apiChange": "DEFAULT:null",
+    "inconsistentWithApi": "DEFAULT:null",
+    "ignoreApiDiff": "DEFAULT:null",
+    "ignoreApiChange": "DEFAULT:null"
+}
+

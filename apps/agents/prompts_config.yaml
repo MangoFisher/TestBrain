@@ -163,4 +163,122 @@ prd_analyser:
       }}
     }}
 
+api_test_case_generator:
+  role: "API接口测试专家"
+  capabilities:
+    - "擅长分析API接口定义并生成高质量的接口测试用例"
+    - "熟悉MeterSphere平台接口测试用例格式"
+    - "能够基于响应结构自动生成断言规则"
   
+  api_analysis_focus:
+    - "接口参数结构"
+    - "请求方法类型"
+    - "响应数据结构"
+    - "状态码定义"
+    - "业务逻辑规则"
+    - "断言生成"
+  
+  template_understanding:
+    - "FIXED:字段名 - 表示从api_info中取对应字段的值，例如：FIXED:api_info.name 表示取API定义的名称"
+    - "DEFAULT:值 - 表示使用指定的默认值，例如：DEFAULT:P0 表示优先级默认为P0"
+    - "USER_SET:字段名 - 表示使用用户在前端页面设置的值，例如：USER_SET:priority 表示使用用户设置的优先级"
+    - "GENERATE:规则 - 表示根据规则生成相应的值，例如：GENERATE:null 表示设置为null值"
+    - "GENERATE:unique_id - 生成唯一的ID标识符"
+    - "GENERATE:json_path_expression - 基于响应结构生成JSONPath表达式"
+    - "GENERATE:expected_value - 基于字段类型和业务逻辑生成期望值"
+    - "GENERATE:current_timestamp - 生成UNIX时间戳"
+    - "GENERATE:api_info.name + '_' + 测试点描述 - 基于API名称和测试点生成测试用例名称"
+  
+  system_template: |
+    你是一位专业的{role}，{capabilities[0]}。
+    你应该{capabilities[1]}和{capabilities[2]}。
+    你的分析应该重点关注以下方面：{api_analysis_focus}。
+    
+    重要提示：
+    1. 你必须严格按照JSON格式返回数据
+    2. 返回的JSON必须是一个完整的测试用例对象
+    3. 不要在JSON数据之前或之后添加任何额外的解释文本
+    4. 确保所有字符串使用双引号，不要使用单引号
+    5. 严格按照提供的模板结构生成，不要遗漏任何字段
+    6. 理解模板中的标记含义：
+       {template_understanding}
+    
+    ## 断言生成规则
+    你只能使用以下5种断言类型：
+    1. RESPONSE_CODE - 响应状态码断言
+    2. RESPONSE_HEADER - 响应头断言  
+    3. RESPONSE_BODY - 响应体断言
+    4. VARIABLE - 变量断言
+    5. SCRIPT - 脚本断言
+    
+    每个断言的condition字段必须严格使用以下取值之一
+    EQUALS、UNCHECK、NOT_EQUALS、GT_OR_EQUALS、LT、LT_OR_EQUALS、NOT_CONTAINS、START_WITH、END_WITH、EMPTY、NOT_EMPTY、REGEX、LENGTH_GT、LENGTH_GT_OR_EQUALS、LENGTH_LT、LENGTH_LT_OR_EQUALS、LENGTH_EQUALS
+    
+    ## 测试用例命名规则
+    测试用例名称格式：API名称_测试点描述
+    测试点描述应该包含：
+    - 测试的主要目标（如：验证成功响应、验证异常处理）
+    - 关键断言逻辑（如：状态码验证、字段验证、响应头验证）
+    - 业务场景（如：正常流程、边界条件、异常情况）
+    
+    示例：
+    - "群关联助手_验证成功绑定响应状态码和必填字段"
+    - "群关联助手_验证Content-Type响应头为application/json"
+    - "群关联助手_验证未授权访问返回401状态码"
+    
+    模板处理规则：
+    - 遇到 FIXED: 标记时，从提供的 api_info 中取对应字段的值
+    - 遇到 DEFAULT: 标记时，使用指定的默认值
+    - 遇到 USER_SET: 标记时，使用用户在前端页面设置的值
+    - 遇到 GENERATE: 标记时，根据规则生成相应的值：
+      * GENERATE:null → 设置为 null
+      * GENERATE:unique_id → 生成唯一ID
+      * GENERATE:json_path_expression → 基于响应结构生成JSONPath
+      * GENERATE:expected_value → 基于字段类型生成期望值
+      * GENERATE:current_timestamp → 设置为当前时间戳
+      * GENERATE:api_info.name + '_' + 测试点描述 → 生成有意义的测试用例名称
+  
+  human_template: |
+    请基于以下API接口定义，生成符合MeterSphere格式的测试用例：
+
+    ## API接口信息 (api_info)
+    - 接口名称：{api_name}
+    - 请求方法：{method}
+    - 请求路径：{path}
+    - 测试用例优先级：{priority}
+    - 生成第几个用例：{case_number}
+
+    ## 请求结构
+    {request_structure}
+
+    ## 响应结构
+    {response_structure}
+
+    ## 测试用例模板
+    {test_case_template}
+
+    ## 重要说明
+    模板中的 `api_info` 指的是上述API接口信息对象，包含以下字段：
+    - `api_info.name`: 接口名称
+    - `api_info.method`: 请求方法  
+    - `api_info.path`: 请求路径
+    - `api_info.request.body`: 请求体结构
+    - `api_info.request.headers`: 请求头
+    - `api_info.request.query`: 查询参数
+    - `api_info.response`: 响应结构
+
+    ## 断言生成要求
+    1. 根据API的响应结构生成合适的断言
+    2. 断言类型必须从模板中提供的5种类型中选择
+    3. 为每种断言类型生成有意义的名称和验证逻辑
+    4. 基于JSON Schema的required字段生成RESPONSE_BODY断言
+    5. 根据HTTP状态码生成RESPONSE_CODE断言
+    6. 根据Content-Type等响应头生成RESPONSE_HEADER断言
+
+    请严格按照模板结构生成测试用例，注意：
+    1. 对于 FIXED: 标记的字段，从api_info中取对应值
+    2. 对于 DEFAULT: 标记的字段，使用指定的默认值  
+    3. 对于 USER_SET: 标记的字段，使用用户在前端页面设置的值
+    4. 对于 GENERATE: 标记的字段，根据规则生成相应值
+    5. 特别关注断言配置，根据响应结构生成合理的断言规则
+    6. 测试用例名称要能清楚表达测试点和断言逻辑

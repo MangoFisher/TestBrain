@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}TestBrain - 接口case生成{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-container {
+        margin: 20px;
+        padding: 20px;
+    }
+    
+    .upload-area {
+        border: 2px dashed #ddd;
+        border-radius: 8px;
+        padding: 60px 40px;
+        text-align: center;
+        background-color: #f8f9fa;
+        margin: 30px 0;
+        min-height: 300px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .upload-area:hover {
+        border-color: #007bff;
+        background-color: #f1f7ff;
+    }
+
+    .upload-area.highlight {
+        border-color: #28a745;
+        background-color: #d4edda;
+        transform: scale(1.02);
+        transition: all 0.2s ease;
+    }
+
+    .file-input-button {
+        padding: 12px 30px;
+        font-size: 16px;
+        margin-bottom: 20px;
+    }
+
+    .upload-hint {
+        color: #666;
+        font-size: 14px;
+        margin-top: 15px;
+    }
+
+    .submit-container {
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    .submit-button {
+        padding: 12px 40px;
+        font-size: 16px;
+    }
+
+    .selected-file {
+        margin-top: 15px;
+        color: #28a745;
+        font-weight: 500;
+        display: none;  /* 初始状态隐藏 */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="upload-container">
+    <h4 class="mb-4">接口case生成</h4>
+    <form method="post" enctype="multipart/form-data" id="uploadForm">
+        {% csrf_token %}
+        <div class="upload-area">
+            <input type="file" name="single_file" id="single_file" style="display: none;">
+            <button type="button" class="btn btn-primary file-input-button" onclick="document.getElementById('single_file').click()">
+                选择文件
+            </button>
+            <div class="upload-hint">
+                拖拽文件到此区域或点击选择文件<br>
+                <span style="font-weight: bold; color: #dc3545;">(文件必须是从Metersphere导出的API json文件)</span>
+            </div>
+            <div id="selected-file" class="selected-file"></div>
+            <div id="uploadStatus" style="margin-top: 10px; color: #666;"></div>
+        </div>
+        <div class="submit-container">
+            <button type="submit" class="btn btn-success submit-button" id="submitBtn">上传文件</button>
+        </div>
+    </form>
+</div>
+
+<!-- 接口选择界面 -->
+<div id="api-selection" style="display: none;">
+    <h3>选择要生成测试用例的接口</h3>
+    
+    <div class="form-group">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover" style="margin-bottom: 0; border: 1px solid #dee2e6;">
+                <thead>
+                    <tr>
+                        <th width="80" class="text-center" style="background-color: #007bff; color: white; border-bottom: 2px solid #0056b3; vertical-align: middle;">
+                            <input type="checkbox" id="select-all" class="form-check-input" style="margin: 0; transform: scale(1.2);">
+                        </th>
+                        <th width="40%" style="background-color: #007bff; color: white; border-bottom: 2px solid #0056b3;">API路径</th>
+                        <th style="background-color: #007bff; color: white; border-bottom: 2px solid #0056b3;">API名称</th>
+                    </tr>
+                </thead>
+                <tbody id="api-table-body">
+                    <!-- 动态生成的接口表格行 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="count-per-api">每个接口生成测试用例数量：</label>
+        <input type="number" id="count-per-api" class="form-control" value="1" min="1" max="10">
+    </div>
+    
+    <div class="form-group">
+        <label for="priority">测试用例优先级：</label>
+        <select id="priority" class="form-control">
+            <option value="P0">P0 - 最高优先级</option>
+            <option value="P1">P1 - 高优先级</option>
+            <option value="P2">P2 - 中优先级</option>
+            <option value="P3">P3 - 低优先级</option>
+            <option value="P4">P4 - 最低优先级</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label for="llm-provider">大模型提供商：</label>
+        <select id="llm-provider" class="form-control">
+            {% for key, provider in llm_providers.items %}
+            <option value="{{ key }}" {% if key == llm_provider %}selected{% endif %}>
+                {{ provider.name }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <button type="button" class="btn btn-primary" id="generateBtn">生成API测试用例</button>
+</div>
+
+<!-- 生成进度界面 -->
+<div id="generation-progress" style="display: none;">
+    <h3>正在生成测试用例...</h3>
+    <div class="progress">
+        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+    </div>
+    <div id="progress-text">准备中...</div>
+</div>
+
+<!-- 生成结果界面 -->
+<div id="generation-result" style="display: none;">
+    <h3>API测试用例生成完成</h3>
+    <div id="result-message"></div>
+    <a id="download-link" href="#" class="btn btn-success">下载更新后的文件</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/api_case_generate.js' %}"></script>
+{% endblock %}

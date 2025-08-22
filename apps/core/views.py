@@ -9,6 +9,7 @@ from .forms import TestCaseForm, TestCaseReviewForm, KnowledgeBaseForm
 from ..agents.generator import TestCaseGeneratorAgent
 from ..agents.reviewer import TestCaseReviewerAgent
 from ..agents.analyser import PrdAnalyserAgent
+from ..agents.api_case_generator import APITestCaseGeneratorAgent, parse_api_definitions, generate_test_cases_for_apis
 from ..knowledge.service import KnowledgeService
 
 # 初始化服务
@@ -826,6 +827,123 @@ def prd_analyser(request):
                 'success': False,
                 'error': '未接收到文件'
             })
+        return JsonResponse({
+        'success': False,
+        'error': '不支持的请求方法'
+    })
+
+
+
+
+
+def download_file(request):
+    """文件下载视图"""
+    file_path = request.GET.get('file_path')
+    if not file_path or not os.path.exists(file_path):
+        return JsonResponse({'error': '文件不存在'}, status=404)
+    
+    # 安全检查：确保文件在uploads目录内
+    uploads_dir = os.path.abspath('uploads')
+    file_abs_path = os.path.abspath(file_path)
+    
+    if not file_abs_path.startswith(uploads_dir):
+        return JsonResponse({'error': '访问被拒绝'}, status=404)
+    
+    # 返回文件
+    with open(file_path, 'rb') as f:
+        response = HttpResponse(f.read())
+        response['Content-Type'] = 'application/json'
+        response['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
+        return response
+
+
+def api_case_generate(request):
+    """
+    页面-接口case生成页面视图函数
+    """
+    logger.info("===== 进入api_case_generate视图函数 =====")
+    logger.info(f"请求方法: {request.method}")
+    
+    if request.method == 'GET':
+        context = {
+            'llm_providers': PROVIDERS,
+            'llm_provider': DEFAULT_PROVIDER,
+        }
+        return render(request, 'api_case_generate.html', context)
+    elif request.method == 'POST':
+        if 'single_file' in request.FILES:
+            uploaded_file = request.FILES['single_file']
+            logger.info(f"接收到文件: {uploaded_file.name}")
+            
+            # 检查文件类型
+            if not uploaded_file.name.lower().endswith('.json'):
+                return JsonResponse({
+                    'success': False,
+                    'error': '只支持JSON格式的文件'
+                })
+            
+            try:
+                # 确保uploads目录存在
+                uploads_dir = os.path.join(settings.MEDIA_ROOT)
+                os.makedirs(uploads_dir, exist_ok=True)
+                
+                # 生成唯一文件名（避免重名）
+                file_name = uploaded_file.name
+                base_name, ext = os.path.splitext(file_name)
+                counter = 1
+                while os.path.exists(os.path.join(uploads_dir, file_name)):
+                    file_name = f"{base_name}_{counter}{ext}"
+                    counter += 1
+                
+                # 保存文件到uploads目录
+                file_path = os.path.join(uploads_dir, file_name)
+                with open(file_path, 'wb+') as f:
+                    for chunk in uploaded_file.chunks():
+                        f.write(chunk)
+                
+                logger.info(f"文件保存成功: {file_path}")
+                
+                # 解析JSON文件，提取接口列表
+                api_list = parse_api_definitions(file_path)
+                
+                return JsonResponse({
+                    'success': True,
+                    'api_list': api_list,
+                    'file_path': file_path
+                })
+                
+            except Exception as e:
+                logger.error(f"文件保存失败: {str(e)}", exc_info=True)
+                return JsonResponse({
+                    'success': False,
+                    'error': f'文件保存失败: {str(e)}'
+                })
+        
+        elif 'generate_test_cases' in request.POST:
+            # 生成测试用例
+            file_path = request.POST.get('file_path')
+            selected_apis = json.loads(request.POST.get('selected_apis'))
+            count_per_api = int(request.POST.get('count_per_api', 1))
+            priority = request.POST.get('priority', 'P0')
+            llm_provider = request.POST.get('llm_provider', 'deepseek')
+            
+            # 生成测试用例
+            result = generate_test_cases_for_apis(
+                file_path, selected_apis, count_per_api, priority, llm_provider
+            )
+            
+            # 在返回结果中添加 file_path 字段，以便前端下载
+            if result.get('success'):
+                result['file_path'] = file_path
+            
+            return JsonResponse(result)
+        
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': '未接收到文件'
+            })
+    
     return JsonResponse({
         'success': False,
         'error': '不支持的请求方法'

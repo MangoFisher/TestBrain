@@ -13,6 +13,10 @@ urlpatterns = [
     path('upload/', views.upload_single_file, name='upload_single_file'),
     #PRD分析页面
     path('analyser/', views.prd_analyser, name='prd_analyser'),
+    #接口case生成页面
+    path('api_case_generate/', views.api_case_generate, name='api_case_generate'),
+    #文件下载
+    path('download_file/', views.download_file, name='download_file'),
     
     # API路由
     path('api/copy-test-cases/', views.copy_test_cases, name='copy_test_cases'), #复制选中的用例集合

@@ -1,5 +1,6 @@
 from pathlib import Path
 import yaml
+import json
 from typing import Dict, Any
 from langchain.prompts import ChatPromptTemplate
 from langchain.prompts.chat import SystemMessagePromptTemplate, HumanMessagePromptTemplate
@@ -86,6 +87,34 @@ class PromptTemplateManager:
         # 创建系统消息模板
         system_message_prompt = SystemMessagePromptTemplate.from_template(
             config['system_template'].format(**system_vars)  # 直接格式化模板
+        )
+        
+        # 创建人类消息模板
+        human_message_prompt = HumanMessagePromptTemplate.from_template(
+            config['human_template']
+        )
+        
+        # 组合成聊天提示词模板
+        return ChatPromptTemplate.from_messages([
+            system_message_prompt,
+            human_message_prompt
+        ])
+    
+    def get_api_test_case_generator_prompt(self) -> ChatPromptTemplate:
+        """获取API测试用例生成的提示词模板"""
+        config = self.config['api_test_case_generator']
+        
+        # 准备系统消息的变量并格式化模板
+        system_vars = {
+            'role': config['role'],
+            'capabilities': config['capabilities'],
+            'api_analysis_focus': ', '.join(config['api_analysis_focus']),
+            'template_understanding': '\n'.join(config['template_understanding'])
+        }
+        
+        # 创建系统消息模板
+        system_message_prompt = SystemMessagePromptTemplate.from_template(
+            config['system_template'].format(**system_vars)
         )
         
         # 创建人类消息模板
@@ -194,6 +223,94 @@ class PrdAnalyserPrompt:
         return self.prompt_template.format_messages(
             markdown_content=markdown_content
         )
+
+
+class APITestCaseGeneratorPrompt:
+    """API测试用例生成提示词"""
+    
+    def __init__(self):
+        self.prompt_manager = PromptTemplateManager()
+        self.prompt_template = self.prompt_manager.get_api_test_case_generator_prompt()
+    
+    def format_messages(self, api_info: Dict[str, Any], priority: str, 
+                       case_number: int, test_case_template: str) -> list:
+        """格式化消息
+        
+        Args:
+            api_info: API接口信息
+            priority: 测试用例优先级
+            case_number: 生成第几个用例
+            test_case_template: 测试用例结构模板
+            
+        Returns:
+            格式化后的消息列表
+        """
+        return self.prompt_template.format_messages(
+            api_name=api_info.get('name', ''),
+            method=api_info.get('method', ''),
+            path=api_info.get('path', ''),
+            priority=priority,
+            case_number=case_number,
+            request_structure=self._format_request_structure(api_info),
+            response_structure=self._format_response_structure(api_info),
+            test_case_template=test_case_template
+        )
+    
+    def _format_request_structure(self, api_info: Dict[str, Any]) -> str:
+        """格式化请求结构信息"""
+        request = api_info.get('request', {})
+        
+        # 格式化基本信息
+        structure = f"请求方法: {request.get('method', '')}\n"
+        structure += f"请求路径: {request.get('path', '')}\n"
+        
+        # 格式化请求头
+        headers = request.get('headers', [])
+        if headers:
+            structure += "\n请求头:\n"
+            for header in headers:
+                structure += f"- {header.get('key', '')}: {header.get('value', '')}\n"
+        
+        # 格式化查询参数
+        query = request.get('query', [])
+        if query:
+            structure += "\n查询参数:\n"
+            for param in query:
+                structure += f"- {param.get('key', '')}: {param.get('value', '')} ({param.get('paramType', 'string')})\n"
+        
+        # 格式化请求体
+        body = request.get('body', {})
+        if body.get('bodyType') == 'JSON':
+            json_body = body.get('jsonBody', {})
+            if json_body.get('jsonValue'):
+                structure += f"\n请求体 (JSON):\n{json_body['jsonValue']}\n"
+            elif json_body.get('jsonSchema'):
+                structure += f"\n请求体 Schema:\n{json.dumps(json_body['jsonSchema'], ensure_ascii=False, indent=2)}\n"
+        
+        return structure
+    
+    def _format_response_structure(self, api_info: Dict[str, Any]) -> str:
+        """格式化响应结构信息"""
+        response = api_info.get('response', [])
+        
+        structure = "响应状态码:\n"
+        for resp in response:
+            status_code = resp.get('statusCode', '')
+            default_flag = resp.get('defaultFlag', False)
+            structure += f"- {status_code} {'(默认)' if default_flag else ''}\n"
+            
+            # 格式化响应体
+            body = resp.get('body', {})
+            if body.get('bodyType') == 'JSON':
+                json_body = body.get('jsonBody', {})
+                if json_body.get('jsonValue'):
+                    structure += f"  响应体: {json_body['jsonValue']}\n"
+                elif json_body.get('jsonSchema'):
+                    required_fields = json_body.get('jsonSchema', {}).get('required', [])
+                    if required_fields:
+                        structure += f"  必填字段: {', '.join(required_fields)}\n"
+        
+        return structure
 
 
 # 使用示例
