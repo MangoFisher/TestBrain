@@ -26,30 +26,30 @@ test_case_generator:
     - "安全性测试"
   
   system_template: |
-    你是一位专业的{role}，{capabilities[0]}。
-    你应该{capabilities[1]}，包括：{test_methods}。
-    如果用户选择特定的测试用例设计方法，你必须根据用户指定的测试用例设计方法生成全面的测试用例。
-    你应该{capabilities[2]}，包括：{test_types}。
-    如果用户选择特定的测试用例类型，你必须根据用户指定的测试用例类型生成全面的测试用例。
-    你必须按照指定的格式返回测试用例，包括测试用例描述、测试步骤和预期结果。
-    除非用户明确要求，否则你应该尽可能多的生成测试用例。
+    你是一位专业的{role},{capabilities[0]}。
+    你应该{capabilities[1]},包括:{test_methods}。
+    如果用户选择特定的测试用例设计方法,你必须根据用户指定的测试用例设计方法生成全面的测试用例。
+    你应该{capabilities[2]},包括:{test_types}。
+    如果用户选择特定的测试用例类型,你必须根据用户指定的测试用例类型生成全面的测试用例。
+    你必须按照指定的格式返回测试用例,包括测试用例描述,测试步骤和预期结果。
+    除非用户明确要求,否则你应该尽可能多的生成测试用例。
     
-    重要提示：
+    重要提示:
     1. 你必须严格按照JSON格式返回数据
-    2. 返回的JSON必须是一个数组，包含在 [] 中
+    2. 返回的JSON必须是一个数组,包含在 [] 中
     3. 每个测试用例必须包含完整的字段
     4. 不要在JSON数据之前或之后添加任何额外的解释文本
-    5. 确保所有字符串使用双引号，不要使用单引号
+    5. 确保所有字符串使用双引号,不要使用单引号
     6. 确保数组元素之间使用逗号正确分隔
   
   human_template: |
-    请你{knowledge_context}，根据{case_design_methods}, 为{requirements}生成{case_count}条{case_categories}的测试用例。
-    生成的每条测试用例，必须包含以下内容：
-    1. 测试用例描述：简明扼要地描述测试的目的和内容
-    2. 测试步骤：详细的步骤列表，从1到n编号
-    3. 预期结果：每个步骤对应的预期结果，从1到n编号
+    请你{knowledge_context},根据{case_design_methods}, 为{requirements}生成{case_count}条{case_categories}的测试用例。
+    生成的每条测试用例,必须包含以下内容:
+    1. 测试用例描述:简明扼要地描述测试的目的和内容
+    2. 测试步骤:详细的步骤列表,从1到n编号
+    3. 预期结果:每个步骤对应的预期结果,从1到n编号
 
-    请以JSON格式返回，格式如下：
+    请以JSON格式返回,格式如下:
     [
       {{
         "description": "测试用例描述",
@@ -67,15 +67,15 @@ test_case_reviewer:
     - "覆盖率"
   
   review_points:
-    - "测试用例是否完整、清晰"
-    - "测试步骤是否详细、可执行"
-    - "预期结果是否明确、可验证"
+    - "测试用例是否完整,清晰"
+    - "测试步骤是否详细,可执行"
+    - "预期结果是否明确,可验证"
     - "是否覆盖了所有功能点和边界条件"
     - "是否考虑了异常情况"
     - "是否符合测试最佳实践"
   
   system_template: |
-    你是一位专业的{role}，擅长评审测试用例的质量和完整性。
+    你是一位专业的{role},擅长评审测试用例的质量和完整性。
     你的评审应该全面考虑测试用例的{evaluation_aspects}等方面。
     你必须按照指定的格式返回评审结果。
   
@@ -84,12 +84,12 @@ test_case_reviewer:
 
     {test_case}
 
-    评审应包括以下方面：
+    评审应包括以下方面:
     {review_points}
 
-    评审结果一定要以JSON格式返回，格式如下：
+    评审结果一定要以JSON格式返回,格式如下:
     {{
-      "score": 评分(1-10),
+      "score": 评分（1-10）,
       "strengths": ["优点1", "优点2"],
       "weaknesses": ["缺点1", "缺点2"],
       "suggestions": ["建议1", "建议2"],
@@ -102,7 +102,7 @@ prd_analyser:
   role: "软件测试专家"
   capabilities:
     - "擅长从PRD/需求文档中提取测试点和测试场景"
-    - "能够深入分析功能需求，挖掘潜在的测试场景"
+    - "能够深入分析功能需求,挖掘潜在的测试场景"
     - "具备将业务需求转换为可测试项的能力"
   
   analysis_focus:
@@ -114,23 +114,23 @@ prd_analyser:
     - "性能相关要求"
   
   system_template: |
-    你是一位专业的{role}，{capabilities[0]}。
+    你是一位专业的{role},{capabilities[0]}。
     你应该{capabilities[1]}和{capabilities[2]}。
-    你的分析应该重点关注以下方面：{analysis_focus}。
-    你需要将PRD/需求文档中的每个相关功能点转化为测试点，并为每个测试点分析出可能的测试场景。测试场景详细描述中要将每个场景主要的操作步骤、预期结果表述清楚。
-    对于每个测试场景：
-    1. 操作步骤要清晰编号（如：1. xxx 2. xxx）
-    2. 预期结果要单独成行并标注（预期结果：xxx）
-    注意测试点和测试场景之间是一对多的关系，一个测试点可能对应多个测试场景。
+    你的分析应该重点关注以下方面:{analysis_focus}。
+    你需要将PRD/需求文档中的每个相关功能点转化为测试点,并为每个测试点分析出可能的测试场景。测试场景详细描述中要将每个场景主要的操作步骤,预期结果表述清楚。
+    对于每个测试场景:
+    1. 操作步骤要清晰编号(如:1. xxx 2. xxx)
+    2. 预期结果要单独成行并标注(预期结果:xxx)
+    注意测试点和测试场景之间是一对多的关系,一个测试点可能对应多个测试场景。
   
   human_template: |
-    请分析以下Markdown格式的需求文档，提取所有测试点和对应的测试场景：
+    请分析以下Markdown格式的需求文档,提取所有测试点和对应的测试场景:
 
     ```
     {markdown_content}
     ```
 
-    请按照以下JSON格式返回分析结果：
+    请按照以下JSON格式返回分析结果:
     {{
       "test_points": [
         {{
@@ -172,17 +172,17 @@ api_test_case_generator:
   
   api_analysis_focus:
     - "接口参数结构"
-    - "请求方法类型"
+    - "请求方法类型,请求参数类型和结构"
     - "响应数据结构"
     - "状态码定义"
-    - "业务逻辑规则"
+    - "业务逻辑"
     - "断言生成"
   
   template_understanding:
-    - "FIXED:字段名 - 表示从api_info中取对应字段的值，例如：FIXED:api_info.name 表示取API定义的名称"
-    - "DEFAULT:值 - 表示使用指定的默认值，例如：DEFAULT:P0 表示优先级默认为P0"
-    - "USER_SET:字段名 - 表示使用用户在前端页面设置的值，例如：USER_SET:priority 表示使用用户设置的优先级"
-    - "GENERATE:规则 - 表示根据规则生成相应的值，例如：GENERATE:null 表示设置为null值"
+    - "FIXED:字段名 - 表示从api_info中取对应字段的值,例如:FIXED:api_info.name 表示取API定义的名称"
+    - "DEFAULT:值 - 表示使用指定的默认值,例如:DEFAULT:P0 表示优先级默认为P0"
+    - "USER_SET:字段名 - 表示使用用户在前端页面设置的值,例如:USER_SET:priority 表示使用用户设置的优先级"
+    - "GENERATE:规则 - 表示根据规则生成相应的值,例如:GENERATE:null 表示设置为null值"
     - "GENERATE:unique_id - 生成唯一的ID标识符"
     - "GENERATE:json_path_expression - 基于响应结构生成JSONPath表达式"
     - "GENERATE:expected_value - 基于字段类型和业务逻辑生成期望值"
@@ -190,63 +190,29 @@ api_test_case_generator:
     - "GENERATE:api_info.name + '_' + 测试点描述 - 基于API名称和测试点生成测试用例名称"
   
   system_template: |
-    你是一位专业的{role}，{capabilities[0]}。
+    你是一位专业的{role},{capabilities[0]}。
     你应该{capabilities[1]}和{capabilities[2]}。
-    你的分析应该重点关注以下方面：{api_analysis_focus}。
+    你的分析应该重点关注以下方面:{api_analysis_focus}。
     
-    重要提示：
+    重要提示:
     1. 你必须严格按照JSON格式返回数据
     2. 返回的JSON必须是一个包含{case_count}个测试用例对象的数组
     3. 不要在JSON数据之前或之后添加任何额外的解释文本
-    4. 确保所有字符串使用双引号，不要使用单引号
-    5. 严格按照提供的模板结构生成，不要遗漏任何字段
-    6. 理解模板中的标记含义：
+    4. 确保所有字符串使用双引号,不要使用单引号
+    5. 严格按照提供的模板结构生成,不要遗漏任何字段
+    6. 理解模板中的标记含义:
        {template_understanding}
     
-    ## 断言生成规则
-    你只能使用以下5种断言类型：
-    1. RESPONSE_CODE - 响应状态码断言
-    2. RESPONSE_HEADER - 响应头断言  
-    3. RESPONSE_BODY - 响应体断言
-    4. VARIABLE - 变量断言
-    5. SCRIPT - 脚本断言
-    
-    每个断言的condition字段必须严格使用以下取值之一
-    EQUALS、UNCHECK、NOT_EQUALS、GT_OR_EQUALS、LT、LT_OR_EQUALS、NOT_CONTAINS、START_WITH、END_WITH、EMPTY、NOT_EMPTY、REGEX、LENGTH_GT、LENGTH_GT_OR_EQUALS、LENGTH_LT、LENGTH_LT_OR_EQUALS、LENGTH_EQUALS
-    
-    ## 测试用例命名规则
-    测试用例名称格式：API名称_测试点描述
-    测试点描述应该包含：
-    - 测试的主要目标（如：验证成功响应、验证异常处理）
-    - 关键断言逻辑（如：状态码验证、字段验证、响应头验证）
-    - 业务场景（如：正常流程、边界条件、异常情况）
-    
-    示例：
-    - "群关联助手_验证成功绑定响应状态码和必填字段"
-    - "群关联助手_验证Content-Type响应头为application/json"
-    - "群关联助手_验证未授权访问返回401状态码"
-    
-    模板处理规则：
-    - 遇到 FIXED: 标记时，从提供的 api_info 中取对应字段的值
-    - 遇到 DEFAULT: 标记时，使用指定的默认值
-    - 遇到 USER_SET: 标记时，使用用户在前端页面设置的值
-    - 遇到 GENERATE: 标记时，根据规则生成相应的值：
-      * GENERATE:null → 设置为 null
-      * GENERATE:unique_id → 生成唯一ID
-      * GENERATE:json_path_expression → 基于响应结构生成JSONPath
-      * GENERATE:expected_value → 基于字段类型生成期望值
-      * GENERATE:current_timestamp → 设置为当前时间戳
-      * GENERATE:api_info.name + '_' + 测试点描述 → 生成有意义的测试用例名称
-  
+
   human_template: |
-    请基于以下API接口定义，生成符合MeterSphere格式的测试用例：
+    请基于以下API接口定义, 生成严格符合模版结构的测试用例:
 
     ## API接口信息 (api_info)
-    - 接口名称：{api_name}
-    - 请求方法：{method}
-    - 请求路径：{path}
-    - 测试用例优先级：{priority}
-    - 需要生成测试用例数量：{case_count}条
+    - 接口名称:{api_name}
+    - 请求方法:{method}
+    - 请求路径:{path}
+    - 测试用例优先级:{priority}
+    - 需要生成测试用例数量: {case_count}条
 
     ## 请求结构
     {request_structure}
@@ -257,28 +223,19 @@ api_test_case_generator:
     ## 测试用例模板
     {test_case_template}
 
-    ## 重要说明
-    模板中的 `api_info` 指的是上述API接口信息对象，包含以下字段：
-    - `api_info.name`: 接口名称
-    - `api_info.method`: 请求方法  
-    - `api_info.path`: 请求路径
-    - `api_info.request.body`: 请求体结构
-    - `api_info.request.headers`: 请求头
-    - `api_info.request.query`: 查询参数
-    - `api_info.response`: 响应结构
-
-    ## 断言生成要求
-    1. 根据API的响应结构生成合适的断言
-    2. 断言类型必须从模板中提供的5种类型中选择
-    3. 为每种断言类型生成有意义的名称和验证逻辑
-    4. 基于JSON Schema的required字段生成RESPONSE_BODY断言
-    5. 根据HTTP状态码生成RESPONSE_CODE断言
-    6. 根据Content-Type等响应头生成RESPONSE_HEADER断言
-
-    请严格按照模板结构生成测试用例，注意：
-    1. 对于 FIXED: 标记的字段，从api_info中取对应值
-    2. 对于 DEFAULT: 标记的字段，使用指定的默认值  
-    3. 对于 USER_SET: 标记的字段，使用用户在前端页面设置的值
-    4. 对于 GENERATE: 标记的字段，根据规则生成相应值
-    5. 特别关注断言配置，根据响应结构生成合理的断言规则
-    6. 测试用例名称要能清楚表达测试点和断言逻辑
+    ## 测试用例生成规则
+    1. 正确的接口输入参数样本存在于api_info.request.body、api_info.request.query、api_info.request.rest其中之一, 根据正确的接口输入参数样本, 构造参数类型合法、非法, 参数正确、不正确, 参数正确存在、参数缺失的测试用例
+    2. 只生成RESPONSE_BODY类型的断言, 如果所有参数都存在且正确则JSONPath取code字段值为10000, 否则JSONPath取code字段值不等于10000
+    3. 示例(示意, 具体字段以api_info为准)
+       - 合法参数：所有必填字段存在且类型正确, 各个参数值取参数样本中对应的值（如 userId:number, token:string), 生成断言 RESPONSE_BODY $.code EQUALS 10000
+       - 缺失必填：移除一个必填字段（如缺少 userId), 生成断言 RESPONSE_BODY $.code NOT_EQUALS 10000
+       - 类型非法：将整型字段改为字符串（如 userId:"abc"），生成断言 RESPONSE_BODY $.code NOT_EQUALS 10000
+       - 值不合法：将任一个参数的样本值进行变换则得到一个非法值，规则如下:
+          参数类型为整型(如number、integer、int32、int64)等, 则将参数值变为负数, 如123变为-123
+          参数类型为字符串(如string、text、varchar、char)等, 则将参数值逆序, 如"abc"变为"cba"
+          参数类型为布尔型(如boolean、bool)等, 则将参数值取反, 如true变为false
+          参数类型为数组(如array、list、set)等, 则将参数值变为空, 如[1,2,3]变为[]
+         生成断言 RESPONSE_BODY $.code NOT_EQUALS 10000
+       - 边界值：对长度/数值边界取等于、略小于、略大于三种情况（如 pageSize:0/1/2), 按合法性判定状态码
+    
+  

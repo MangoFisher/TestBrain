@@ -1,4 +1,5 @@
 import json
+import time
 import os
 import logging
 from typing import List, Dict, Any, Optional
@@ -15,7 +16,7 @@ class APITestCaseGeneratorAgent:
         self.llm_provider = llm_provider
         self.llm = LLMServiceFactory.create(llm_provider)
         self.prompt = APITestCaseGeneratorPrompt()
-        self.template = self._load_test_case_template()
+        self.test_case_template = self._load_test_case_template()
         self.max_workers = 5
     
     def _load_test_case_template(self) -> Dict[str, Any]:
@@ -39,17 +40,14 @@ class APITestCaseGeneratorAgent:
     
     def _generate_multiple_test_cases(self, api_info: Dict[str, Any], 
                                       priority: str, count: int) -> Optional[List[Dict[str, Any]]]:
-        """一次生成多条测试用例（单次LLM调用返回数组）"""
+        """为某个api接口一次生成多条测试用例（单次LLM调用返回数组）
+        使用最小输出协议，仅让LLM生成差异字段，然后在本地合并为完整模板。
+        """
         import threading
         thread_id = threading.current_thread().ident
         try:
-            # 基于现有提示词，追加一次性生成多条的说明
-            messages = self.prompt.format_messages(
-                api_info=api_info,
-                priority=priority,
-                case_count=count,
-                test_case_template=json.dumps(self.template, ensure_ascii=False, indent=2)
-            )
+            # 使用最小生成模板构建提示
+            messages = self._build_messages_minimal(api_info, priority, count)
 
             # 打印完整提示词
             try:
@@ -77,18 +75,18 @@ class APITestCaseGeneratorAgent:
                         langchain_messages.append(msg)
                 invoke_result = self.llm.invoke(langchain_messages)
                 response = getattr(invoke_result, 'content', invoke_result)
-
-            cases = self._parse_response_to_test_cases(response)
-            if cases is None:
+            logger.info(f"[Thread-{thread_id}] 大模型多用例原始响应: {response}")
+            minimal_cases = self._parse_response_to_test_cases(response)
+            if not minimal_cases:
                 return None
 
-            # 后处理
+            # 合并为完整用例
             processed: List[Dict[str, Any]] = []
-            for case in cases:
+            for mcase in minimal_cases:
                 try:
-                    processed.append(self._post_process_test_case(case, api_info, priority))
+                    processed.append(self._merge_minimal_case_to_full_case(mcase, api_info, priority))
                 except Exception as e:
-                    logger.error(f"[Thread-{thread_id}] 多用例后处理失败: {e}")
+                    logger.error(f"[Thread-{thread_id}] 合并最小用例失败: {e}")
             return processed
         except Exception as e:
             logger.error(f"[Thread-{thread_id}] 生成多条测试用例失败: {e}")
@@ -146,6 +144,310 @@ class APITestCaseGeneratorAgent:
         except Exception as e:
             logger.error(f"后处理测试用例失败: {e}")
             return test_case
+
+    # ===== 新增：最小模板、消息构建、合并与断言校验 =====
+    def _create_minimal_generation_template(self) -> Dict[str, Any]:
+        return {
+            "id": "TC-001",
+            "name": "用例名称(≤40字)",
+            "description": "用例描述(≤60字, 可选)",
+            "request_body_json": {},
+            "request_query": [
+                {
+                    "param_name": "要测试的参数名(如: pageSize)",
+                    "param_value": "测试用的参数值(如: 10)"
+                }
+            ],
+            "request_rest": [
+                {
+                    "param_name": "要测试的参数名(如: userCode)",
+                    "param_value": "测试用的参数值(如: oa1922897972947259394)"
+                }
+            ],
+            "assertions": [
+                {
+                    "assertionType": "RESPONSE_BODY",
+                    "enable": True,
+                    "name": "响应体",
+                    "id": "USER_SET",
+                    "projectId": None,
+                    "assertionBodyType": "JSON_PATH",
+                    "jsonPathAssertion": {
+                        "assertions": [
+                            {
+                                "enable": True,
+                                "expression": "code",
+                                "condition": "EQUALS",
+                                "expectedValue": "10000",
+                                "valid": True
+                            }
+                        ]
+                    },
+                    "xpathAssertion": {
+                        "responseFormat": "XML",
+                        "assertions": []
+                    },
+                    "documentAssertion": None,
+                    "regexAssertion": {
+                        "assertions": []
+                    },
+                    "bodyAssertionClassByType": "io.metersphere.project.api.assertion.body.MsJSONPathAssertion",
+                    "bodyAssertionDataByType": {
+                        "assertions": [
+                            {
+                                "enable": True,
+                                "expression": "code",
+                                "condition": "EQUALS",
+                                "expectedValue": "10000",
+                                "valid": True
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+
+    def _build_messages_minimal(self, api_info: Dict[str, Any], priority: str, count: int) -> list:
+        minimal_template = self._create_minimal_generation_template()
+        return self.prompt.format_messages(
+            api_info=api_info,
+            priority=priority,
+            case_count=count,
+            test_case_template=json.dumps(minimal_template, ensure_ascii=False, indent=2)
+        )
+
+    def _merge_minimal_case_to_full_case(self, minimal_case: Dict[str, Any], api_info: Dict[str, Any], priority: str) -> Dict[str, Any]:
+        import copy, time
+        full_case = copy.deepcopy(self.test_case_template)
+
+        # 注入 API 信息
+        # full_case['apiDefinitionName'] = api_info.get('name', '')
+        # full_case['method'] = api_info.get('method', '')
+        # full_case['path'] = api_info.get('path', '')
+
+        req = full_case.get('request') or {}
+        api_req = api_info.get('request', {})
+        req['path'] = api_info.get('path', '')
+        req['method'] = api_info.get('method', '')
+        req['headers'] = api_req.get('headers', [])
+        req['query'] = api_req.get('query', [])
+        req['body'] = api_req.get('body', {})
+        req['rest'] = api_req.get('rest', [])
+        #req.setdefault('polymorphicName', 'MsHTTPElement')
+        # req.setdefault('enable', True)
+        full_case['request'] = req
+
+        # if not req.get('children'):
+        #     req['children'] = [{
+        #         'polymorphicName': 'MsCommonElement',
+        #         'enable': True,
+        #         'preProcessorConfig': {'enableGlobal': True, 'processors': []},
+        #         'postProcessorConfig': {'enableGlobal': True, 'processors': []},
+        #         'assertionConfig': {'enableGlobal': True, 'assertions': []}
+        #     }]
+        child0 = req['children'][0]
+        # child0.setdefault('assertionConfig', {'enableGlobal': True, 'assertions': []})
+
+        # 代码手动填充
+        ts = int(time.time() * 1000)
+        full_case['priority'] = priority
+        full_case['tags'] = ['TestBrain']
+        # full_case['status'] = 'DONE'
+        # full_case['passRate'] = 'NONE'
+        # full_case['createTime'] = ts
+        # full_case['updateTime'] = ts
+
+        # LLM 差异字段
+        name = minimal_case.get('name') or '自动化测试用例'
+        full_case['name'] = name
+        full_case['request']['name'] = name
+
+        # 应用最小请求覆盖（body/query/rest）
+        self._apply_minimal_request_overrides(full_case, minimal_case, api_info)
+
+        raw_assertions = minimal_case.get('assertions', [])
+        valid_assertions = self._normalize_and_validate_assertions(raw_assertions)
+        for idx, a in enumerate(valid_assertions):
+            a['id'] = f"{ts}"  # 生成每个断言中的id字段
+        child0['assertionConfig']['assertions'] = valid_assertions
+
+        return full_case
+
+    def _normalize_and_validate_assertions(self, assertions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        result: List[Dict[str, Any]] = []
+        if not isinstance(assertions, list):
+            return result
+
+        for a in assertions:
+            atype = a.get('assertionType')
+            aname = a.get('name')
+
+            # 仅当名称与类型对应时继续
+            if atype == 'RESPONSE_CODE' and aname != '状态码':
+                continue
+            if atype == 'RESPONSE_HEADER' and aname != '响应头':
+                continue
+            if atype == 'RESPONSE_BODY' and aname != '响应体':
+                continue
+
+            if atype == 'RESPONSE_CODE':
+                cond = a.get('condition')
+                if cond not in ('EQUALS', 'NOT_EQUALS'):
+                    continue
+                expected = str(a.get('expectedValue', '200'))
+                item = {
+                    'assertionType': 'RESPONSE_CODE',
+                    'enable': True,
+                    'name': '状态码',
+                    'id': int(time.time()*1000),
+                    'projectId': None,
+                    'condition': cond,
+                    'expectedValue': expected
+                }
+                result.append(item)
+
+            elif atype == 'RESPONSE_HEADER':
+                sub = a.get('assertions', [])
+                if not sub or not isinstance(sub, list):
+                    continue
+                s0 = sub[0]
+                cond = s0.get('condition')
+                if cond not in ('EQUALS', 'NOT_EQUALS'):
+                    continue
+                item = {
+                    'assertionType': 'RESPONSE_HEADER',
+                    'enable': True,
+                    'name': '响应头',
+                    'id': int(time.time()*1000),
+                    'projectId': None,
+                    'assertions': [{
+                        'enable': True,
+                        'header': s0.get('header', 'Content-Type'),
+                        'condition': cond,
+                        'expectedValue': s0.get('expectedValue', 'application/json')
+                    }]
+                }
+                result.append(item)
+
+            elif atype == 'RESPONSE_BODY':
+                body_type = a.get('assertionBodyType', 'JSON_PATH')
+                if body_type != 'JSON_PATH':
+                    continue
+                jpa = a.get('jsonPathAssertion', {}).get('assertions', [])
+                if not jpa or not isinstance(jpa, list):
+                    continue
+                jp0 = jpa[0]
+                cond = jp0.get('condition')
+                if cond not in ('EQUALS', 'NOT_EQUALS'):
+                    continue
+                item = {
+                    'assertionType': 'RESPONSE_BODY',
+                    'enable': True,
+                    'name': '响应体',
+                    'id': int(time.time()*1000),
+                    'projectId': None,
+                    'assertionBodyType': 'JSON_PATH',
+                    'jsonPathAssertion': {
+                        'assertions': [{
+                            'enable': True,
+                            'expression': jp0.get('expression', 'code'),
+                            'condition': cond,
+                            'expectedValue': jp0.get('expectedValue', '10000'),
+                            'valid': True
+                        }]
+                    },
+                    'xpathAssertion': {'responseFormat': 'XML', 'assertions': []},
+                    'documentAssertion': None,
+                    'regexAssertion': {'assertions': []},
+                    'bodyAssertionClassByType': 'io.metersphere.project.api.assertion.body.MsJSONPathAssertion',
+                    'bodyAssertionDataByType': {
+                        'assertions': [{
+                            'enable': True,
+                            'expression': jp0.get('expression', 'code'),
+                            'condition': cond,
+                            'expectedValue': jp0.get('expectedValue', '10000'),
+                            'valid': True
+                        }]
+                    }
+                }
+                result.append(item)
+
+        if not result:
+            result.append({
+                'assertionType': 'RESPONSE_CODE',
+                'enable': True,
+                'name': '状态码',
+                'projectId': None,
+                'condition': 'EQUALS',
+                'expectedValue': '200'
+            })
+        return result
+
+    def _apply_minimal_request_overrides(self, full_case: Dict[str, Any], minimal_case: Dict[str, Any], api_info: Dict[str, Any]) -> None:
+        """将 LLM 生成的差异值应用到 request（body/query/rest），同时同步API定义中的类型信息"""
+        req = full_case.get('request', {})
+        
+        if 'request_body_json' in minimal_case:
+            req.setdefault('body', {})
+            req['body']['jsonValue'] = minimal_case['request_body_json']
+        
+        if 'request_query' in minimal_case:
+            llm_query = minimal_case['request_query'] or []
+            api_query = api_info.get('request', {}).get('query', [])
+
+            # 创建API定义中query参数的映射表
+            api_query_map: Dict[str, Any] = {}
+            for param in api_query:
+                param_key = param.get('key') or param.get('name')
+                if param_key:
+                    api_query_map[param_key] = param
+
+            # 合并：复制API参数结构，仅覆盖value
+            merged_query: List[Dict[str, Any]] = []
+            for llm_param in llm_query:
+                q_name = llm_param.get('param_name') or llm_param.get('key') or llm_param.get('name')
+                q_value = llm_param.get('param_value') or llm_param.get('value')
+                if q_name in api_query_map:
+                    api_param = api_query_map[q_name]
+                    merged_param = api_param.copy()
+                    merged_param['value'] = q_value
+                    merged_query.append(merged_param)
+                else:
+                    logger.warning(f"API定义中未找到query参数: {q_name}")
+
+            req['query'] = merged_query
+        
+        if 'request_rest' in minimal_case:
+            llm_rest = minimal_case['request_rest'] or []
+            api_rest = api_info.get('request', {}).get('rest', [])
+            
+            # 创建API定义中rest参数的映射表
+            api_rest_map = {}
+            for param in api_rest:
+                param_key = param.get('key') or param.get('name')
+                if param_key:
+                    api_rest_map[param_key] = param
+            
+            # 合并LLM生成的值，同时同步API定义中的类型信息
+            merged_rest = []
+            for llm_param in llm_rest:
+                # LLM生成的是简化的参数信息
+                param_name = llm_param.get('param_name') or llm_param.get('key')
+                param_value = llm_param.get('param_value') or llm_param.get('value')
+                
+                if param_name in api_rest_map:
+                    # 如果API定义中有这个参数，使用完整的API定义结构
+                    api_param = api_rest_map[param_name]
+                    merged_param = api_param.copy()  # 复制完整的API定义结构
+                    merged_param['value'] = param_value  # 只更新value字段
+                    merged_rest.append(merged_param)
+                else:
+                    # 如果API定义中没有，记录警告并跳过
+                    logger.warning(f"API定义中未找到参数: {param_name}")
+            
+            req['rest'] = merged_rest
+        
+        full_case['request'] = req
     
     def _process_request_config(self, request_template: Dict[str, Any], 
                                api_info: Dict[str, Any]) -> Dict[str, Any]:

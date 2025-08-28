@@ -132,18 +132,18 @@ LLM_PROVIDERS = {
     'default_provider': 'deepseek',
     'deepseek': {
         'name': 'DeepSeek',
-        'model': 'deepseek-chat', #可以切换, deepseek-reasoner即【深度思考】模式, 可能会稍微慢一些
-        # 'model': 'deepseek-reasoner',
+        #'model': 'deepseek-chat', #可以切换, deepseek-reasoner即【深度思考】模式, 可能会稍微慢一些
+        'model': 'deepseek-reasoner',
         'api_base': 'https://api.deepseek.com/v1',
         'temperature': 1.0,
-        'max_tokens': 8000,
+        'max_tokens': 64000,
     },
     'qwen': {
         'name': '通义千问',
         'model': 'qwen-max',
         'api_base': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         'temperature': 1.0,
-        'max_tokens': 200000,
+        'max_tokens': 8192,
     },
     'openai': {
         'name': 'OpenAI',

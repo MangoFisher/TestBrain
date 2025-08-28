@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse
 from django.views.decorators.http import require_http_methods
 import json
 
@@ -850,11 +850,11 @@ def download_file(request):
         return JsonResponse({'error': '访问被拒绝'}, status=404)
     
     # 返回文件
-    with open(file_path, 'rb') as f:
-        response = HttpResponse(f.read())
-        response['Content-Type'] = 'application/json'
-        response['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
-        return response
+    filename = os.path.basename(file_path)
+    resp = FileResponse(open(file_path, 'rb'), as_attachment=True, filename=filename)
+    resp['Content-Type'] = 'application/octet-stream'
+    resp['X-Content-Type-Options'] = 'nosniff'
+    return resp
 
 
 def api_case_generate(request):

@@ -1,6 +1,7 @@
 from langchain_community.chat_models import ChatOpenAI
 import os
 
+
 class DeepSeekChatModel(ChatOpenAI):
     """DeepSeek聊天模型"""
     
