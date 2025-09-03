@@ -312,9 +312,10 @@ class APITestCaseGeneratorPrompt:
                 except json.JSONDecodeError:
                     pass  # 如果解析失败，使用空字典
             
-            for prop_name, prop_info in properties.items():
-                # 从解析后的字典中获取样例值
-                sample_value = json_value_dict.get(prop_name) if json_value_dict else None
+            # 遍历 jsonValue 中的参数（参数个数和样本值来源）
+            for prop_name, sample_value in json_value_dict.items():
+                # 从 jsonSchema.properties 中获取类型信息
+                prop_info = properties.get(prop_name, {})
                 
                 params_info.append({
                     'name': prop_name,
