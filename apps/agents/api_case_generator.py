@@ -20,6 +20,44 @@ class APITestCaseGeneratorAgent:
         self.test_case_full_template = self._load_test_case_full_template()
         self.max_workers = 5
     
+    def _has_request_parameters(self, api_info: Dict[str, Any]) -> bool:
+        """判断接口是否包含任何请求参数（query/rest/body(JSON)）。
+        - query/rest: 非空列表视为有参数
+        - body(JSON): jsonBody.jsonValue 可解析且含键，或 jsonSchema.properties 含键
+        """
+        request = api_info.get('request') or {}
+
+        # query
+        query_params = request.get('query')
+        if isinstance(query_params, list) and len(query_params) > 0:
+            return True
+
+        # rest
+        rest_params = request.get('rest')
+        if isinstance(rest_params, list) and len(rest_params) > 0:
+            return True
+
+        # body (JSON)
+        body = request.get('body')
+        if isinstance(body, dict) and body.get('bodyType') == 'JSON':
+            json_body = body.get('jsonBody', {}) or {}
+            # 先看 jsonValue 是否有实际键值
+            json_value_str = json_body.get('jsonValue')
+            if isinstance(json_value_str, str) and json_value_str.strip():
+                try:
+                    parsed = json.loads(json_value_str)
+                    if isinstance(parsed, dict) and len(parsed) > 0:
+                        return True
+                except Exception:
+                    # 解析失败则继续看 schema
+                    pass
+            # 再看 schema properties
+            props = (json_body.get('jsonSchema') or {}).get('properties') or {}
+            if isinstance(props, dict) and len(props) > 0:
+                return True
+
+        return False
+
     def _load_test_case_full_template(self) -> Dict[str, Any]:
         """加载测试用例结构模板"""
         template_path = os.path.join(
@@ -117,8 +155,6 @@ class APITestCaseGeneratorAgent:
             return None
     
     
-
-    # ===== 新增：最小模板、消息构建、合并与断言校验 =====
     def _create_minimal_generation_template(self) -> Dict[str, Any]:
         return {
             "id": "TC-001",
@@ -480,6 +516,10 @@ class APITestCaseGeneratorAgent:
         thread_id = threading.current_thread().ident
         api_name = api_def.get('name', '')
         try:
+            # 保护性判断：无参数则不调用模型
+            if not self._has_request_parameters(api_def):
+                logger.info(f"[Thread-{thread_id}] 接口query、rest、body均无请求参数, 跳过LLM生成用例: {api_name}")
+                return []
             cases = self._generate_multiple_test_cases(api_def, priority, count_per_api) or []
             logger.info(f"[Thread-{thread_id}] 接口生成完成: {api_name} - 新增用例 {len(cases)} 条")
             return cases
