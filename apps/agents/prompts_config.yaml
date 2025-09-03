@@ -167,16 +167,13 @@ api_test_case_generator:
   role: "API接口测试专家"
   capabilities:
     - "擅长分析API接口定义并生成高质量的接口测试用例"
-    - "熟悉MeterSphere平台接口测试用例格式"
-    - "能够基于响应结构自动生成断言规则"
+    - "能够基于接口信息、测试用例模版、断言生成规则生成测试用例"
   
   api_analysis_focus:
-    - "接口参数结构"
-    - "请求方法类型,请求参数类型和结构"
-    - "响应数据结构"
-    - "状态码定义"
-    - "业务逻辑"
-    - "断言生成"
+    - "接口参数类型、样例值"
+    - "测试用例模版"
+    - "测试用例生成规则"
+   
   
   template_understanding:
     - "FIXED:字段名 - 表示从api_info中取对应字段的值,例如:FIXED:api_info.name 表示取API定义的名称"
@@ -191,7 +188,7 @@ api_test_case_generator:
   
   system_template: |
     你是一位专业的{role},{capabilities[0]}。
-    你应该{capabilities[1]}和{capabilities[2]}。
+    你应该{capabilities[1]}。
     你的分析应该重点关注以下方面:{api_analysis_focus}。
     
     重要提示:
@@ -200,42 +197,38 @@ api_test_case_generator:
     3. 不要在JSON数据之前或之后添加任何额外的解释文本
     4. 确保所有字符串使用双引号,不要使用单引号
     5. 严格按照提供的模板结构生成,不要遗漏任何字段
-    6. 理解模板中的标记含义:
-       {template_understanding}
+
     
 
   human_template: |
     请基于以下API接口定义, 生成严格符合模版结构的测试用例:
 
-    ## API接口信息 (api_info)
-    - 接口名称:{api_name}
-    - 请求方法:{method}
-    - 请求路径:{path}
-    - 测试用例优先级:{priority}
+    ## API接口信息
+    - 接口名称: {api_name}
+    - 请求方法: {method}
+    - 请求路径: {path}
+    - 测试用例优先级: {priority}
     - 需要生成测试用例数量: {case_count}条
 
-    ## 请求结构
-    {request_structure}
+    ## 参数信息
+    {inter_parameters_info}
 
-    ## 响应结构
-    {response_structure}
+    {inter_response_summary}
 
     ## 测试用例模板
-    {test_case_template}
+    {test_case_min_template}
 
     ## 测试用例生成规则
-    1. 正确的接口输入参数样本存在于api_info.request.body、api_info.request.query、api_info.request.rest其中之一, 根据正确的接口输入参数样本, 构造参数类型合法、非法, 参数正确、不正确, 参数正确存在、参数缺失的测试用例
-    2. 只生成RESPONSE_BODY类型的断言, 如果所有参数都存在且正确则JSONPath取code字段值为10000, 否则JSONPath取code字段值不等于10000
-    3. 示例(示意, 具体字段以api_info为准)
-       - 合法参数：所有必填字段存在且类型正确, 各个参数值取参数样本中对应的值（如 userId:number, token:string), 生成断言 RESPONSE_BODY $.code EQUALS 10000
-       - 缺失必填：移除一个必填字段（如缺少 userId), 生成断言 RESPONSE_BODY $.code NOT_EQUALS 10000
-       - 类型非法：将整型字段改为字符串（如 userId:"abc"），生成断言 RESPONSE_BODY $.code NOT_EQUALS 10000
-       - 值不合法：将任一个参数的样本值进行变换则得到一个非法值，规则如下:
-          参数类型为整型(如number、integer、int32、int64)等, 则将参数值变为负数, 如123变为-123
-          参数类型为字符串(如string、text、varchar、char)等, 则将参数值逆序, 如"abc"变为"cba"
-          参数类型为布尔型(如boolean、bool)等, 则将参数值取反, 如true变为false
-          参数类型为数组(如array、list、set)等, 则将参数值变为空, 如[1,2,3]变为[]
-         生成断言 RESPONSE_BODY $.code NOT_EQUALS 10000
-       - 边界值：对长度/数值边界取等于、略小于、略大于三种情况（如 pageSize:0/1/2), 按合法性判定状态码
-    
-  
+    1. 根据参数信息生成不同类型的测试用例:
+       - 合法参数: 使用样例值, expectedValue="10000"
+       - 缺失必填: 移除必填参数, expectedValue≠"10000"
+       - 类型错误: 改变参数类型, expectedValue≠"10000"
+       - 值不合法: 根据参数类型生成非法值, expectedValue≠"10000"
+       - 边界值: 使用最小/最大值, 按合法性判定expectedValue
+    2. 只生成RESPONSE_BODY类型的断言, expression固定为"code", condition字段只能取EQUALS(表示相等)、NOT_EQUALS(表示不相等)
+    3. 参数变换规则:
+       - 整型: 负数、0、最大值+1
+       - 字符串: 单个字符的字符串、超长字符串、样本字符串替换中间部分的其中一个字符为特殊字符
+       - 布尔型: 取反值
+       - 数组: 空数组、null值
+       - 在生成参数值时, 绝对不要使用任何公式和表达式如"a".repeat(256) 

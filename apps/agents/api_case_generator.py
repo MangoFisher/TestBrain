@@ -1,5 +1,6 @@
 import json
 import time
+import copy
 import os
 import logging
 from typing import List, Dict, Any, Optional
@@ -16,10 +17,10 @@ class APITestCaseGeneratorAgent:
         self.llm_provider = llm_provider
         self.llm = LLMServiceFactory.create(llm_provider)
         self.prompt = APITestCaseGeneratorPrompt()
-        self.test_case_template = self._load_test_case_template()
+        self.test_case_full_template = self._load_test_case_full_template()
         self.max_workers = 5
     
-    def _load_test_case_template(self) -> Dict[str, Any]:
+    def _load_test_case_full_template(self) -> Dict[str, Any]:
         """加载测试用例结构模板"""
         template_path = os.path.join(
             os.path.dirname(__file__),
@@ -115,41 +116,13 @@ class APITestCaseGeneratorAgent:
             logger.error(f"解析多用例响应失败: {e}")
             return None
     
-    def _post_process_test_case(self, test_case: Dict[str, Any], 
-                               api_info: Dict[str, Any], priority: str) -> Dict[str, Any]:
-        """后处理测试用例：填充固定值、生成断言等"""
-        try:
-            # 填充基本信息
-            test_case['priority'] = priority
-            test_case['status'] = 'DONE'
-            test_case['passRate'] = 'NONE'
-            
-            # 填充API相关信息
-            test_case['apiDefinitionName'] = api_info.get('name', '')
-            test_case['method'] = api_info.get('method', '')
-            test_case['path'] = api_info.get('path', '')
-            
-            # 确保request字段存在
-            if 'request' not in test_case:
-                test_case['request'] = {}
-            
-            # 验证断言配置（新增）
-            self._validate_assertions(test_case)
-            
-            # 处理请求配置
-            test_case['request'] = self._process_request_config(test_case['request'], api_info)
-            
-            return test_case
-            
-        except Exception as e:
-            logger.error(f"后处理测试用例失败: {e}")
-            return test_case
+    
 
     # ===== 新增：最小模板、消息构建、合并与断言校验 =====
     def _create_minimal_generation_template(self) -> Dict[str, Any]:
         return {
             "id": "TC-001",
-            "name": "用例名称(≤40字)",
+            "name": "用例名称(接口名称_测试点描述, ≤40字)",
             "description": "用例描述(≤60字, 可选)",
             "request_body_json": {},
             "request_query": [
@@ -213,56 +186,28 @@ class APITestCaseGeneratorAgent:
             api_info=api_info,
             priority=priority,
             case_count=count,
-            test_case_template=json.dumps(minimal_template, ensure_ascii=False, indent=2)
+            test_case_min_template=json.dumps(minimal_template, ensure_ascii=False, indent=2)
         )
 
     def _merge_minimal_case_to_full_case(self, minimal_case: Dict[str, Any], api_info: Dict[str, Any], priority: str) -> Dict[str, Any]:
-        import copy, time
-        full_case = copy.deepcopy(self.test_case_template)
+        '''使用模版文件中定义的测试用例模版结构, 并将大模型生成的参数、断言回填到模版中, 构成一个合法的测试用例'''
+        full_case = copy.deepcopy(self.test_case_full_template)
+        full_case['request'] = copy.deepcopy(api_info.get('request')) # 直接复用接口定义中的request结构, 参数和断言部分由大模型生成后回填
 
-        # 注入 API 信息
-        # full_case['apiDefinitionName'] = api_info.get('name', '')
-        # full_case['method'] = api_info.get('method', '')
-        # full_case['path'] = api_info.get('path', '')
-
-        req = full_case.get('request') or {}
-        api_req = api_info.get('request', {})
-        req['path'] = api_info.get('path', '')
-        req['method'] = api_info.get('method', '')
-        req['headers'] = api_req.get('headers', [])
-        req['query'] = api_req.get('query', [])
-        req['body'] = api_req.get('body', {})
-        req['rest'] = api_req.get('rest', [])
-        #req.setdefault('polymorphicName', 'MsHTTPElement')
-        # req.setdefault('enable', True)
-        full_case['request'] = req
-
-        # if not req.get('children'):
-        #     req['children'] = [{
-        #         'polymorphicName': 'MsCommonElement',
-        #         'enable': True,
-        #         'preProcessorConfig': {'enableGlobal': True, 'processors': []},
-        #         'postProcessorConfig': {'enableGlobal': True, 'processors': []},
-        #         'assertionConfig': {'enableGlobal': True, 'assertions': []}
-        #     }]
+        req = full_case.get('request')
         child0 = req['children'][0]
-        # child0.setdefault('assertionConfig', {'enableGlobal': True, 'assertions': []})
 
         # 代码手动填充
         ts = int(time.time() * 1000)
         full_case['priority'] = priority
         full_case['tags'] = ['TestBrain']
-        # full_case['status'] = 'DONE'
-        # full_case['passRate'] = 'NONE'
-        # full_case['createTime'] = ts
-        # full_case['updateTime'] = ts
 
         # LLM 差异字段
         name = minimal_case.get('name') or '自动化测试用例'
         full_case['name'] = name
         full_case['request']['name'] = name
 
-        # 应用最小请求覆盖（body/query/rest）
+        # 将需要大模型生成的字段应用到full_case中
         self._apply_minimal_request_overrides(full_case, minimal_case, api_info)
 
         raw_assertions = minimal_case.get('assertions', [])
@@ -388,27 +333,39 @@ class APITestCaseGeneratorAgent:
         req = full_case.get('request', {})
         
         if 'request_body_json' in minimal_case:
-            req.setdefault('body', {})
-            req['body']['jsonValue'] = minimal_case['request_body_json']
+            # 严格校验 body 必备结构，缺失即报错，避免静默兜底掩盖问题
+            body = req.get('body')
+            if not isinstance(body, dict):
+                raise ValueError("非法request：缺少 body 或类型错误")
+            json_body = body.get('jsonBody')
+            if not isinstance(json_body, dict):
+                raise ValueError("非法request：缺少 body.jsonBody 或类型错误")
+            data_by_type = body.get('bodyDataByType')
+            if not isinstance(data_by_type, dict):
+                raise ValueError("非法request：缺少 body.bodyDataByType 或类型错误")
+
+            json_value_str = json.dumps(minimal_case['request_body_json'], ensure_ascii=False, indent=2)
+            json_body['jsonValue'] = json_value_str
+            data_by_type['jsonValue'] = json_value_str
         
         if 'request_query' in minimal_case:
             llm_query = minimal_case['request_query'] or []
-            api_query = api_info.get('request', {}).get('query', [])
+            full_case_query = req.get('query', [])
 
             # 创建API定义中query参数的映射表
-            api_query_map: Dict[str, Any] = {}
-            for param in api_query:
+            full_case_query_map: Dict[str, Any] = {}
+            for param in full_case_query:
                 param_key = param.get('key') or param.get('name')
                 if param_key:
-                    api_query_map[param_key] = param
+                    full_case_query_map[param_key] = param
 
             # 合并：复制API参数结构，仅覆盖value
             merged_query: List[Dict[str, Any]] = []
             for llm_param in llm_query:
                 q_name = llm_param.get('param_name') or llm_param.get('key') or llm_param.get('name')
                 q_value = llm_param.get('param_value') or llm_param.get('value')
-                if q_name in api_query_map:
-                    api_param = api_query_map[q_name]
+                if q_name in full_case_query_map:
+                    api_param = full_case_query_map[q_name]
                     merged_param = api_param.copy()
                     merged_param['value'] = q_value
                     merged_query.append(merged_param)
@@ -419,14 +376,14 @@ class APITestCaseGeneratorAgent:
         
         if 'request_rest' in minimal_case:
             llm_rest = minimal_case['request_rest'] or []
-            api_rest = api_info.get('request', {}).get('rest', [])
+            full_case_rest = req.get('rest', [])
             
             # 创建API定义中rest参数的映射表
-            api_rest_map = {}
-            for param in api_rest:
+            full_case_rest_map = {}
+            for param in full_case_rest:
                 param_key = param.get('key') or param.get('name')
                 if param_key:
-                    api_rest_map[param_key] = param
+                    full_case_rest_map[param_key] = param
             
             # 合并LLM生成的值，同时同步API定义中的类型信息
             merged_rest = []
@@ -435,9 +392,9 @@ class APITestCaseGeneratorAgent:
                 param_name = llm_param.get('param_name') or llm_param.get('key')
                 param_value = llm_param.get('param_value') or llm_param.get('value')
                 
-                if param_name in api_rest_map:
+                if param_name in full_case_rest_map:
                     # 如果API定义中有这个参数，使用完整的API定义结构
-                    api_param = api_rest_map[param_name]
+                    api_param = full_case_rest_map[param_name]
                     merged_param = api_param.copy()  # 复制完整的API定义结构
                     merged_param['value'] = param_value  # 只更新value字段
                     merged_rest.append(merged_param)
@@ -449,30 +406,7 @@ class APITestCaseGeneratorAgent:
         
         full_case['request'] = req
     
-    def _process_request_config(self, request_template: Dict[str, Any], 
-                               api_info: Dict[str, Any]) -> Dict[str, Any]:
-        """处理请求配置：根据API信息填充具体值"""
-        try:
-            api_request = api_info.get('request', {})
-            
-            # 复制API的请求配置
-            request_template['path'] = api_info.get('path', '')
-            request_template['method'] = api_info.get('method', '')
-            request_template['headers'] = api_request.get('headers', [])
-            request_template['query'] = api_request.get('query', [])
-            request_template['body'] = api_request.get('body', {})
-            
-            # 确保必要的字段存在
-            if 'polymorphicName' not in request_template:
-                request_template['polymorphicName'] = 'MsHTTPElement'
-            if 'enable' not in request_template:
-                request_template['enable'] = True
-            
-            return request_template
-            
-        except Exception as e:
-            logger.error(f"处理请求配置失败: {e}")
-            return request_template
+    
     
     # 兜底用例逻辑已移除：若模型失败/解析失败，直接返回 None 由上层忽略该用例
 

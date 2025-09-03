@@ -234,7 +234,7 @@ class APITestCaseGeneratorPrompt:
         self.prompt_template = self.prompt_manager.get_api_test_case_generator_prompt()
     
     def format_messages(self, api_info: Dict[str, Any], priority: str, 
-                       case_count: int, test_case_template: str) -> list:
+                       case_count: int, test_case_min_template: str) -> list:
         """格式化消息
         
         Args:
@@ -246,74 +246,143 @@ class APITestCaseGeneratorPrompt:
         Returns:
             格式化后的消息列表
         """
+        # 生成响应摘要，如果有内容则包含标题，否则为空
+        response_summary = self._format_response_summary(api_info)
+        response_block = f"## 响应摘要\n{response_summary}" if response_summary else ""
+        
         return self.prompt_template.format_messages(
             api_name=api_info.get('name', ''),
             method=api_info.get('method', ''),
             path=api_info.get('path', ''),
             priority=priority,
             case_count=case_count,
-            request_structure=self._format_request_structure(api_info),
-            response_structure=self._format_response_structure(api_info),
-            test_case_template=test_case_template
+            inter_parameters_info=self._format_inter_parameters_info(api_info),
+            inter_response_summary=response_block,
+            test_case_min_template=test_case_min_template
         )
     
-    def _format_request_structure(self, api_info: Dict[str, Any]) -> str:
-        """格式化请求结构信息"""
+    def _format_inter_parameters_info(self, api_info: Dict[str, Any]) -> str:
+        """格式化参数的关键信息"""
         request = api_info.get('request', {})
         
-        # 格式化基本信息
-        structure = f"请求方法: {request.get('method', '')}\n"
-        structure += f"请求路径: {request.get('path', '')}\n"
+        # 提取参数信息
+        params_info = []
         
-        # 格式化请求头
-        headers = request.get('headers', [])
-        if headers:
-            structure += "\n请求头:\n"
-            for header in headers:
-                structure += f"- {header.get('key', '')}: {header.get('value', '')}\n"
+        # 从 query 参数
+        for param in request.get('query', []):
+            params_info.append({
+                'name': param.get('key'),
+                'type': param.get('paramType'),
+                'required': param.get('required'),
+                'sample': param.get('value'),
+                'minimum': param.get('minimum', None),
+                'maximum': param.get('maximum', None),
+                'minLength': param.get('minLength', None),
+                'maxLength': param.get('maxLength'),
+                'location': 'query'
+            })
         
-        # 格式化查询参数
-        query = request.get('query', [])
-        if query:
-            structure += "\n查询参数:\n"
-            for param in query:
-                structure += f"- {param.get('key', '')}: {param.get('value', '')} ({param.get('paramType', 'string')})\n"
+        # 从 rest 参数
+        for param in request.get('rest', []):
+            params_info.append({
+                'name': param.get('key'),
+                'type': param.get('paramType'),
+                'required': param.get('required'),
+                'sample': param.get('value'),
+                'minimum': param.get('minimum', None),
+                'maximum': param.get('maximum', None),
+                'minLength': param.get('minLength', None),
+                'maxLength': param.get('maxLength', None),
+                'location': 'path'
+            })
         
-        # 格式化请求体
+        # 从 body 参数
         body = request.get('body', {})
         if body.get('bodyType') == 'JSON':
             json_body = body.get('jsonBody', {})
-            if json_body.get('jsonValue'):
-                structure += f"\n请求体 (JSON):\n{json_body['jsonValue']}\n"
-            elif json_body.get('jsonSchema'):
-                structure += f"\n请求体 Schema:\n{json.dumps(json_body['jsonSchema'], ensure_ascii=False, indent=2)}\n"
+            schema = json_body.get('jsonSchema', {})
+            properties = schema.get('properties', {})
+            
+            # 解析 jsonValue 字符串为字典
+            json_value_dict = {}
+            json_value_str = json_body.get('jsonValue', '')
+            if json_value_str:
+                try:
+                    json_value_dict = json.loads(json_value_str)
+                except json.JSONDecodeError:
+                    pass  # 如果解析失败，使用空字典
+            
+            for prop_name, prop_info in properties.items():
+                # 从解析后的字典中获取样例值
+                sample_value = json_value_dict.get(prop_name) if json_value_dict else None
+                
+                params_info.append({
+                    'name': prop_name,
+                    'type': prop_info.get('type'),
+                    'required': prop_info.get('required'),
+                    'sample': sample_value,
+                    'minimum': prop_info.get('minimum'),
+                    'maximum': prop_info.get('maximum'),
+                    'minLength': prop_info.get('minLength'),
+                    'maxLength': prop_info.get('maxLength'),
+                    'location': 'body'
+                })
         
-        return structure
+        result = ""
+        if params_info:
+            result += "\n"
+            for param in params_info:
+                if param['name']:  # 过滤空参数名
+                    result += f"- {param['name']} ({param['location']}): {param['type']}"
+                    if param['required']:
+                        result += " [必填]"
+                    if param['sample']:
+                        result += f" 样例: {param['sample']}"
+                    if param['minimum'] is not None or param['maximum'] is not None:
+                        result += f" 范围: {param['minimum']}-{param['maximum']}"
+                    if param['minLength'] is not None or param['maxLength'] is not None:
+                        result += f" 长度: {param['minLength']}-{param['maxLength']}"
+                    result += "\n"
+        else:
+            result += "无参数\n"
+        
+        return result
     
-    def _format_response_structure(self, api_info: Dict[str, Any]) -> str:
-        """格式化响应结构信息"""
+    def _format_response_summary(self, api_info: Dict[str, Any]) -> str:
+        """格式化响应摘要信息"""
+        #TODO: 目前暂不将接口响应信息传入大模型, 后面有需要再补充
+        return ""
         response = api_info.get('response', [])
         
-        structure = "响应状态码:\n"
+        if not response:
+            return "响应: 无响应信息"
+        
+        # 只提取关键信息
+        result = "响应摘要:\n"
         for resp in response:
             status_code = resp.get('statusCode', '')
             default_flag = resp.get('defaultFlag', False)
-            structure += f"- {status_code} {'(默认)' if default_flag else ''}\n"
+            result += f"- 状态码: {status_code} {'(默认)' if default_flag else ''}\n"
             
-            # 格式化响应体
+            # 只提取响应体的关键字段信息
             body = resp.get('body', {})
             if body.get('bodyType') == 'JSON':
                 json_body = body.get('jsonBody', {})
                 if json_body.get('jsonValue'):
-                    structure += f"  响应体: {json_body['jsonValue']}\n"
+                    # 只显示关键字段
+                    json_value = json_body['jsonValue']
+                    if isinstance(json_value, dict):
+                        key_fields = ['code', 'message', 'data', 'success']
+                        for field in key_fields:
+                            if field in json_value:
+                                result += f"  {field}: {json_value[field]}\n"
                 elif json_body.get('jsonSchema'):
+                    # 只显示必填字段
                     required_fields = json_body.get('jsonSchema', {}).get('required', [])
                     if required_fields:
-                        structure += f"  必填字段: {', '.join(required_fields)}\n"
+                        result += f"  必填字段: {', '.join(required_fields)}\n"
         
-        return structure
-
-
+        return result
 # 使用示例
 if __name__ == "__main__":
     # 测试用例生成
