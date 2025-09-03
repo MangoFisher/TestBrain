@@ -39,6 +39,12 @@
                     <table class="table table-bordered table-hover">
                         <thead class="thead-light">
                             <tr>
+                                <th style="width: 40px;">
+                                    <div class="custom-control custom-checkbox">
+                                        <input type="checkbox" class="custom-control-input" id="select-all-pending">
+                                        <label class="custom-control-label" for="select-all-pending"></label>
+                                    </div>
+                                </th>
                                 <th>状态</th>
                                 <th>用例描述</th>
                                 <th>测试步骤</th>
@@ -49,6 +55,13 @@
                         <tbody>
                             {% for test_case in pending_test_cases %}
                             <tr>
+                                <td>
+                                    <div class="custom-control custom-checkbox">
+                                        <input type="checkbox" class="custom-control-input pending-case-checkbox" 
+                                               id="pending-{{ test_case.id }}" data-id="{{ test_case.id }}">
+                                        <label class="custom-control-label" for="pending-{{ test_case.id }}"></label>
+                                    </div>
+                                </td>
                                 <td><span class="badge badge-warning">待评审</span></td>
                                 <td>{{ test_case.description }}</td>
                                 <td>{{ test_case.test_steps }}</td>
@@ -60,6 +73,13 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+                
+                <!-- 待评审标签页的操作按钮 -->
+                <div class="mt-3">
+                    <button id="copy-selected-pending" class="btn btn-primary mr-2">复制</button>
+                    <button id="export-excel-pending" class="btn btn-success mr-2">导出到Excel</button>
+                    <button id="delete-selected-pending" class="btn btn-danger">删除选中项</button>
                 </div>
                 
                 <!-- 待评审测试用例的分页 -->
@@ -128,7 +148,8 @@
                 <!-- 只在已通过标签页中添加操作按钮 -->
                 <div class="mt-3">
                     <button id="copy-selected" class="btn btn-primary mr-2">复制</button>
-                    <button id="export-excel" class="btn btn-success">导出到Excel</button>
+                    <button id="export-excel" class="btn btn-success mr-2">导出到Excel</button>
+                    <button id="delete-selected-approved" class="btn btn-danger">删除选中项</button>
                 </div>
                 
                 <!-- 已通过测试用例的分页 -->
@@ -508,6 +529,88 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // 待评审 - 全选/单选
+    const selectAllPending = document.getElementById('select-all-pending');
+    const pendingCheckboxes = document.querySelectorAll('.pending-case-checkbox');
+    if (selectAllPending) {
+        selectAllPending.addEventListener('change', function() {
+            pendingCheckboxes.forEach(cb => {
+                cb.checked = this.checked;
+            });
+        });
+    }
+    pendingCheckboxes.forEach(cb => {
+        cb.addEventListener('change', function() {
+            if (!this.checked && selectAllPending) {
+                selectAllPending.checked = false;
+            } else if (Array.from(pendingCheckboxes).every(x => x.checked) && selectAllPending) {
+                selectAllPending.checked = true;
+            }
+        });
+    });
+
+    // 待评审 - 复制
+    const copyPendingBtn = document.getElementById('copy-selected-pending');
+    if (copyPendingBtn) {
+        copyPendingBtn.addEventListener('click', async function() {
+            const ids = Array.from(document.querySelectorAll('.pending-case-checkbox:checked'))
+                .map(cb => cb.getAttribute('data-id'));
+            if (ids.length === 0) {
+                alert('请先选择要复制的测试用例');
+                return;
+            }
+            try {
+                const response = await fetch('/api/copy-test-cases/?ids=' + ids.join(','), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.message || '复制失败');
+                }
+                const textToCopy = data.test_cases.map(testCase => (
+                    `测试用例描述：${testCase.description}\n` +
+                    `测试步骤：${testCase.test_steps}\n` +
+                    `预期结果：${testCase.expected_results}\n` +
+                    `----------------------------------------`
+                )).join('\n\n');
+                if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(textToCopy);
+                    alert('测试用例已复制到剪贴板！');
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = textToCopy;
+                    textarea.style.position = 'fixed';
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    alert('测试用例已复制到剪贴板！');
+                }
+            } catch (error) {
+                console.error('操作失败:', error);
+                alert('操作失败：' + error.message);
+            }
+        });
+    }
+
+    // 待评审 - 导出Excel
+    const exportPendingBtn = document.getElementById('export-excel-pending');
+    if (exportPendingBtn) {
+        exportPendingBtn.addEventListener('click', function() {
+            const ids = Array.from(document.querySelectorAll('.pending-case-checkbox:checked'))
+                .map(cb => cb.getAttribute('data-id'));
+            if (ids.length === 0) {
+                alert('请先选择要导出的测试用例');
+                return;
+            }
+            window.location.href = '/api/export-test-cases-excel/?ids=' + ids.join(',');
+        });
+    }
     // 未通过标签页的全选功能
     const selectAllRejected = document.getElementById('select-all-rejected');
     const rejectedCheckboxes = document.querySelectorAll('.rejected-case-checkbox');
@@ -530,22 +633,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // 删除按钮功能
-    const deleteButton = document.getElementById('delete-selected');
-    if (deleteButton) {
-        deleteButton.addEventListener('click', async function() {
-            const selectedIds = Array.from(document.querySelectorAll('.rejected-case-checkbox:checked'))
+    // 通用 - 批量删除绑定
+    function bindBulkDelete(buttonId, checkboxSelector) {
+        const btn = document.getElementById(buttonId);
+        if (!btn) return;
+        btn.addEventListener('click', async function() {
+            const selectedIds = Array.from(document.querySelectorAll(`${checkboxSelector}:checked`))
                 .map(checkbox => checkbox.getAttribute('data-id'));
-                
             if (selectedIds.length === 0) {
                 alert('请先选择要删除的测试用例');
                 return;
             }
-            
             if (!confirm('确定要删除选中的测试用例吗？此操作不可恢复。')) {
                 return;
             }
-            
             try {
                 const response = await fetch('/api/delete-test-cases/?ids=' + selectedIds.join(','), {
                     method: 'DELETE',
@@ -553,13 +654,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                     }
                 });
-                
                 const data = await response.json();
                 if (data.success) {
-                    window.location.reload();  // 刷新当前页面
+                    window.location.reload();
                     alert('删除成功！');
                 } else {
-                    throw new Error(data.message);
+                    throw new Error(data.message || '删除失败');
                 }
             } catch (error) {
                 console.error('删除失败:', error);
@@ -567,6 +667,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // 绑定三个Tab的删除按钮
+    bindBulkDelete('delete-selected-pending', '.pending-case-checkbox');
+    bindBulkDelete('delete-selected-approved', '.case-checkbox');
+    bindBulkDelete('delete-selected', '.rejected-case-checkbox');
 });
 </script>
 {% endblock %} 
