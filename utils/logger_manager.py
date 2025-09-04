@@ -69,7 +69,7 @@ class LogManager:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(self.log_level)
         console_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            '%(asctime)s - %(name)s - %(levelname)s - [thread=%(thread)d %(threadName)s] - %(message)s'
         )
         console_handler.setFormatter(console_formatter)
         root_logger.addHandler(console_handler)
@@ -83,7 +83,7 @@ class LogManager:
         )
         file_handler.setLevel(self.log_level)
         file_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            '%(asctime)s - %(name)s - %(levelname)s - [thread=%(thread)d %(threadName)s] - %(message)s'
         )
         file_handler.setFormatter(file_formatter)
         root_logger.addHandler(file_handler)
@@ -112,7 +112,7 @@ class LogManager:
         )
         handler.setLevel(self.log_level)
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            '%(asctime)s - %(name)s - %(levelname)s - [thread=%(thread)d %(threadName)s] - %(message)s'
         )
         handler.setFormatter(formatter)
         

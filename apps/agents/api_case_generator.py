@@ -7,6 +7,8 @@ from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .prompts import APITestCaseGeneratorPrompt
 from ..llm.base import LLMServiceFactory
+from .parsers.api_test_case_parser import parse_minimal_cases_or_raise
+from .parsers.retry_utils import generate_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -81,41 +83,11 @@ class APITestCaseGeneratorAgent:
                                       priority: str, count: int) -> Optional[List[Dict[str, Any]]]:
         """为某个api接口一次生成多条测试用例（单次LLM调用返回数组）
         使用最小输出协议，仅让LLM生成差异字段，然后在本地合并为完整模板。
+        使用 Pydantic 解析和自动重试机制。
         """
-        import threading
-        thread_id = threading.current_thread().ident
         try:
-            # 使用最小生成模板构建提示
-            messages = self._build_messages_minimal(api_info, priority, count)
-
-            # 打印完整提示词
-            try:
-                prompt_text = "\n\n".join([getattr(m, 'content', str(m)) for m in messages])
-                logger.info(f"[Thread-{thread_id}] [LLM Prompt-MULTI] API={api_info.get('name', '')} Count={count}\n{prompt_text}")
-            except Exception:
-                pass
-
-            # 单次调用生成多条
-            if hasattr(self.llm, 'generate_with_history'):
-                response = self.llm.generate_with_history(messages)
-            else:
-                from langchain_core.messages import HumanMessage, SystemMessage
-                langchain_messages = []
-                for msg in messages:
-                    if hasattr(msg, 'type') and msg.type == 'system':
-                        langchain_messages.append(SystemMessage(content=msg.content))
-                    elif hasattr(msg, 'type') and msg.type == 'human':
-                        langchain_messages.append(HumanMessage(content=msg.content))
-                    elif hasattr(msg, 'role') and msg.role == 'system':
-                        langchain_messages.append(SystemMessage(content=msg.content))
-                    elif hasattr(msg, 'role') and msg.role == 'user':
-                        langchain_messages.append(HumanMessage(content=msg.content))
-                    else:
-                        langchain_messages.append(msg)
-                invoke_result = self.llm.invoke(langchain_messages)
-                response = getattr(invoke_result, 'content', invoke_result)
-            logger.info(f"[Thread-{thread_id}] 大模型多用例原始响应: {response}")
-            minimal_cases = self._parse_response_to_test_cases(response)
+            # 使用新的解析和重试机制
+            minimal_cases = self._generate_with_retry(api_info, priority, count)
             if not minimal_cases:
                 return None
 
@@ -123,12 +95,14 @@ class APITestCaseGeneratorAgent:
             processed: List[Dict[str, Any]] = []
             for mcase in minimal_cases:
                 try:
-                    processed.append(self._merge_minimal_case_to_full_case(mcase, api_info, priority))
+                    # 将 Pydantic 对象转换为 dict
+                    mcase_dict = mcase.dict() if hasattr(mcase, 'dict') else mcase
+                    processed.append(self._merge_minimal_case_to_full_case(mcase_dict, api_info, priority))
                 except Exception as e:
-                    logger.error(f"[Thread-{thread_id}] 合并最小用例失败: {e}")
+                    logger.error("合并最小用例失败: %s", e)
             return processed
         except Exception as e:
-            logger.error(f"[Thread-{thread_id}] 生成多条测试用例失败: {e}")
+            logger.error("生成多条测试用例失败: %s", e)
             return None
 
     
@@ -160,7 +134,10 @@ class APITestCaseGeneratorAgent:
             "id": "TC-001",
             "name": "用例名称(接口名称_测试点描述, ≤40字)",
             "description": "用例描述(≤60字, 可选)",
-            "request_body_json": {},
+            "request_body_json": { 
+                "param_name": "要测试的参数名(如: isVirtually)",
+                "param_value": "测试用的参数值(如: 1)"     
+            },
             "request_query": [
                 {
                     "param_name": "要测试的参数名(如: pageSize)",
@@ -216,40 +193,109 @@ class APITestCaseGeneratorAgent:
             ]
         }
 
-    def _build_messages_minimal(self, api_info: Dict[str, Any], priority: str, count: int) -> list:
+    def _build_messages_minimal(self, api_info: Dict[str, Any], priority: str, count: int, 
+                               include_format_instructions: bool = False) -> list:
         minimal_template = self._create_minimal_generation_template()
         return self.prompt.format_messages(
             api_info=api_info,
             priority=priority,
             case_count=count,
-            test_case_min_template=json.dumps(minimal_template, ensure_ascii=False, indent=2)
+            api_test_case_min_template=json.dumps(minimal_template, ensure_ascii=False, indent=2),
+            include_format_instructions=include_format_instructions
         )
+
+    def _generate_with_retry(self, api_info: Dict[str, Any], priority: str, count: int) -> Optional[List]:
+        """使用重试机制生成最小用例"""
+        
+        include_format_instructions = True  # 首次不带，重试时再带上
+
+        # 定义一次 LLM 调用函数
+        def call_llm_once():
+            messages = self._build_messages_minimal(
+                api_info, priority, count,
+                include_format_instructions=include_format_instructions
+            )
+            
+            # 打印完整提示词
+            try:
+                prompt_text = "\n\n".join([getattr(m, 'content', str(m)) for m in messages])
+                logger.info("[LLM Prompt-MULTI] API=%s Count=%s\n%s", api_info.get('name', ''), count, prompt_text)
+            except Exception:
+                pass
+
+            # 单次调用生成多条
+            if hasattr(self.llm, 'generate_with_history'):
+                response = self.llm.generate_with_history(messages)
+            else:
+                from langchain_core.messages import HumanMessage, SystemMessage
+                langchain_messages = []
+                for msg in messages:
+                    if hasattr(msg, 'type') and msg.type == 'system':
+                        langchain_messages.append(SystemMessage(content=msg.content))
+                    elif hasattr(msg, 'type') and msg.type == 'human':
+                        langchain_messages.append(HumanMessage(content=msg.content))
+                    elif hasattr(msg, 'role') and msg.role == 'system':
+                        langchain_messages.append(SystemMessage(content=msg.content))
+                    elif hasattr(msg, 'role') and msg.role == 'user':
+                        langchain_messages.append(HumanMessage(content=msg.content))
+                    else:
+                        langchain_messages.append(msg)
+                invoke_result = self.llm.invoke(langchain_messages)
+                response = getattr(invoke_result, 'content', invoke_result)
+            
+            logger.info("大模型多用例原始响应: %s", response)
+            return response
+
+        # 定义重试时的回调（增强提示词）
+        def on_retry(attempt):
+            logger.warning("解析失败，第 %d 次重试，增强格式约束", attempt + 1)
+            # 重试时减少生成数量，提高成功率
+            nonlocal count
+            count = max(1, count // 2)
+            # 从下一次开始追加严格的格式说明
+            nonlocal include_format_instructions
+            include_format_instructions = True
+
+        # 执行重试生成
+        try:
+            return generate_with_retry(
+                call_llm=call_llm_once,
+                parse_cases=parse_minimal_cases_or_raise,
+                on_retry=on_retry,
+                max_retries=2
+            )
+        except Exception as e:
+            logger.error("重试后仍失败: %s", e)
+            return None
 
     def _merge_minimal_case_to_full_case(self, minimal_case: Dict[str, Any], api_info: Dict[str, Any], priority: str) -> Dict[str, Any]:
         '''使用模版文件中定义的测试用例模版结构, 并将大模型生成的参数、断言回填到模版中, 构成一个合法的测试用例'''
         full_case = copy.deepcopy(self.test_case_full_template)
-        full_case['request'] = copy.deepcopy(api_info.get('request')) # 直接复用接口定义中的request结构, 参数和断言部分由大模型生成后回填
+        # 1.直接复用接口定义中的request结构, 参数和断言部分由大模型生成后回填
+        full_case['request'] = copy.deepcopy(api_info.get('request')) 
 
         req = full_case.get('request')
         child0 = req['children'][0]
 
-        # 代码手动填充
-        ts = int(time.time() * 1000)
+        # 2.填充用户设置的用例优先级和代码中设置的用例标签
         full_case['priority'] = priority
         full_case['tags'] = ['TestBrain']
 
-        # LLM 差异字段
-        name = minimal_case.get('name') or '自动化测试用例'
+        # 3.填充用例名称
+        name = minimal_case.get('name') or 'TestBrain生成的用例'
         full_case['name'] = name
         full_case['request']['name'] = name
 
-        # 将需要大模型生成的字段应用到full_case中
+        # 4.将需要大模型生成的参数回填到full_case中的request字段
         self._apply_minimal_request_overrides(full_case, minimal_case, api_info)
 
         raw_assertions = minimal_case.get('assertions', [])
         valid_assertions = self._normalize_and_validate_assertions(raw_assertions)
+        ts = int(time.time() * 1000)
         for idx, a in enumerate(valid_assertions):
             a['id'] = f"{ts}"  # 生成每个断言中的id字段
+
+        # 5.将大模型生成的断言回填到full_case中的request中的assertionConfig字段
         child0['assertionConfig']['assertions'] = valid_assertions
 
         return full_case
@@ -512,19 +558,17 @@ class APITestCaseGeneratorAgent:
 
     def _generate_cases_for_single_api(self, api_def: Dict[str, Any], priority: str, count_per_api: int) -> List[Dict[str, Any]]:
         """为单个接口一次性生成多条测试用例（按接口并发，单次LLM调用）"""
-        import threading
-        thread_id = threading.current_thread().ident
         api_name = api_def.get('name', '')
         try:
             # 保护性判断：无参数则不调用模型
             if not self._has_request_parameters(api_def):
-                logger.info(f"[Thread-{thread_id}] 接口query、rest、body均无请求参数, 跳过LLM生成用例: {api_name}")
+                logger.info("接口 query、rest、body 均无请求参数，跳过 LLM 生成用例：%s", api_name)
                 return []
             cases = self._generate_multiple_test_cases(api_def, priority, count_per_api) or []
-            logger.info(f"[Thread-{thread_id}] 接口生成完成: {api_name} - 新增用例 {len(cases)} 条")
+            logger.info("接口生成完成: %s - 新增用例 %d 条", api_name, len(cases))
             return cases
         except Exception as e:
-            logger.error(f"[Thread-{thread_id}] 接口多用例生成异常: {api_name}: {e}")
+            logger.error("接口多用例生成异常: %s: %s", api_name, e)
             return []
 
     def _get_default_assertion(self):

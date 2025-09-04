@@ -211,12 +211,12 @@ api_test_case_generator:
     - 需要生成测试用例数量: {case_count}条
 
     ## 参数信息
-    {inter_parameters_info}
+    {api_parameters_info}
 
-    {inter_response_summary}
+    {api_response_summary}
 
     ## 测试用例模板
-    {test_case_min_template}
+    {api_test_case_min_template}
 
     ## 测试用例生成规则
     1. 根据参数信息生成不同类型的测试用例:
@@ -228,7 +228,7 @@ api_test_case_generator:
     2. 只生成RESPONSE_BODY类型的断言, expression固定为"code", condition字段只能取EQUALS(表示相等)、NOT_EQUALS(表示不相等)
     3. 参数变换规则:
        - 整型: 负数、0、最大值+1
-       - 字符串: 单个字符的字符串、超长字符串、样本字符串替换中间部分的其中一个字符为特殊字符
+       - 字符串: 单个字符的字符串、超长字符串(200个字符以内)、样本字符串替换中间部分的其中一个字符为特殊字符
        - 布尔型: 取反值
        - 数组: 空数组、null值
        - 在生成参数值时, 绝对不要使用任何公式和表达式如"a".repeat(256) 
