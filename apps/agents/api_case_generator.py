@@ -10,6 +10,8 @@ from ..llm.base import LLMServiceFactory
 from .parsers.api_test_case_parser import parse_minimal_cases_or_raise
 from .parsers.retry_utils import generate_with_retry
 
+from .progress_registry import set_progress
+
 logger = logging.getLogger(__name__)
 
 class APITestCaseGeneratorAgent:
@@ -322,9 +324,17 @@ class APITestCaseGeneratorAgent:
 
     def generate_test_cases_for_apis_batch(self, api_definitions: List[Dict], 
                                        selected_apis: List[str], count_per_api: int, 
-                                       priority: str) -> Dict:
+                                       priority: str, task_id: Optional[str] = None) -> Dict:
         """批量生成测试用例（多线程生成，主线程合并）"""
         try:
+            if not task_id:
+                task_id = f"task_{int(time.time()*1000)}"
+            # step 1
+            set_progress(task_id, {
+                'step': 1,
+                'message': '解析API定义文件',
+                'percentage': 10
+            })
             # 建立 path -> api_def 的索引，便于快速定位
             path_to_api: Dict[str, Dict[str, Any]] = {}
             for api in api_definitions:
@@ -335,16 +345,35 @@ class APITestCaseGeneratorAgent:
             # 过滤有效的选择（根据文件中实际存在的 path）
             valid_paths = [p for p in selected_apis if p in path_to_api]
             if not valid_paths:
+                set_progress(task_id, {
+                    'step': -1,
+                    'message': '未找到有效的接口路径',
+                    'percentage': 0
+                })
                 return {
                     'success': False,
                     'message': '未找到有效的接口路径',
                 }
 
+            # step 2
+            set_progress(task_id, {
+                'step': 2,
+                'message': '验证接口参数',
+                'percentage': 20
+            })
             logger.info(f"开始并发生成。选中接口数: {len(valid_paths)}，每个接口生成: {count_per_api} 条")
 
             # 子线程只负责生成，不改动 api_definitions
             results_by_path: Dict[str, List[Dict[str, Any]]] = {p: [] for p in valid_paths}
 
+            # step 3
+            set_progress(task_id, {
+                'step': 3,
+                'message': '调用大模型生成用例',
+                'percentage': 30,
+                'total_apis': len(valid_paths),
+                'completed_apis': 0
+            })
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 future_to_path = {}
                 for api_path in valid_paths:
@@ -352,15 +381,33 @@ class APITestCaseGeneratorAgent:
                     fut = executor.submit(self._generate_cases_for_single_api, api_def, priority, count_per_api)
                     future_to_path[fut] = (api_path, api_def.get('name', ''))
 
+                completed = 0
                 for fut in as_completed(future_to_path):
                     api_path, api_name = future_to_path[fut]
                     try:
                         cases = fut.result() or []
                         results_by_path[api_path].extend(cases)
+                        completed += 1
+                        percent = 30 + int((completed * 50) / max(1, len(valid_paths)))
+                        set_progress(task_id, {
+                            'step': 3,
+                            'message': f'正在处理接口: {api_name}',
+                            'percentage': percent,
+                            'current_api': api_name,
+                            'total_apis': len(valid_paths),
+                            'completed_apis': completed
+                        })
                         logger.info(f"接口生成完成: {api_name} - 新增用例 {len(cases)} 条")
                     except Exception as e:
+                        completed += 1
                         logger.error(f"接口生成异常: {api_name}: {e}")
 
+            # step 4
+            set_progress(task_id, {
+                'step': 4,
+                'message': '合并测试用例',
+                'percentage': 80
+            })
             # 主线程合并结果到 api_definitions
             total_cases = 0
             for api_path, cases in results_by_path.items():
@@ -370,12 +417,14 @@ class APITestCaseGeneratorAgent:
                 api_def['apiTestCaseList'].extend(cases)
                 total_cases += len(cases)
 
+            # step 5: 最终 100% 由外层写回文件后统一写入，避免多源
             logger.info(f"合并完成，共为 {len(results_by_path)} 个接口合并了 {total_cases} 条测试用例")
             return {
                 'success': True,
                 'message': f'成功为{len(valid_paths)}个接口新增生成了测试用例，共 {total_cases} 条',
                 'generated_cases': total_cases,
-                'selected_api_count': len(valid_paths)
+                'selected_api_count': len(valid_paths),
+                'task_id': task_id
             }
 
         except Exception as e:
@@ -461,7 +510,7 @@ def parse_api_definitions(file_path: str) -> List[Dict]:
 
 
 def generate_test_cases_for_apis(file_path: str, selected_apis: list, count_per_api: int, 
-                                 priority: str, llm_provider: str) -> Dict:
+                                 priority: str, llm_provider: str, task_id: Optional[str] = None) -> Dict:
     """为选中的API生成测试用例"""
     try:
         # 读取原文件
@@ -473,13 +522,24 @@ def generate_test_cases_for_apis(file_path: str, selected_apis: list, count_per_
         
         # 批量生成测试用例
         result = agent.generate_test_cases_for_apis_batch(
-            data['apiDefinitions'], selected_apis, count_per_api, priority
+            data['apiDefinitions'], selected_apis, count_per_api, priority, task_id
         )
         
         if result['success']:
             # 写回文件
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
+            # 在进度中补充最终下载路径
+            if task_id:
+                try:
+                    set_progress(task_id, {
+                        'step': 5,
+                        'message': result.get('message', '生成完成'),
+                        'percentage': 100,
+                        'file_path': file_path
+                    })
+                except Exception:
+                    pass
         
         return result
         

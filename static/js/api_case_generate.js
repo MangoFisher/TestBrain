@@ -321,7 +321,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             
             if (result.success) {
-                showGenerationResult(result);
+                // 开始轮询进度
+                if (result.task_id) {
+                    window.currentTaskId = result.task_id;
+                    // 立即拉一次，再定时
+                    await pollProgress(result.task_id);
+                    window.progressTimer = setInterval(() => pollProgress(result.task_id), 2000);
+                }
             } else {
                 alert('生成失败: ' + result.error);
                 // 返回选择界面
@@ -335,6 +341,47 @@ document.addEventListener('DOMContentLoaded', function() {
             // 返回选择界面
             document.getElementById('generation-progress').style.display = 'none';
             document.getElementById('api-selection').style.display = 'block';
+        }
+    }
+
+    // 轮询获取进度
+    async function pollProgress(taskId) {
+        try {
+            const resp = await fetch(`/api/get-generation-progress/?task_id=${encodeURIComponent(taskId)}`);
+            const data = await resp.json();
+            if (!data.success) return;
+            updateProgressUI(data.progress);
+            if (data.progress && data.progress.percentage >= 100) {
+                if (window.progressTimer) {
+                    clearInterval(window.progressTimer);
+                    window.progressTimer = null;
+                }
+            }
+        } catch (e) {
+            console.error('进度查询失败:', e);
+        }
+    }
+
+    function updateProgressUI(progress) {
+        const bar = document.getElementById('progress-bar');
+        const text = document.getElementById('progress-text');
+        const currentApi = document.getElementById('current-api');
+        if (bar && typeof progress.percentage === 'number') {
+            bar.style.width = progress.percentage + '%';
+        }
+        if (text && progress.message) {
+            text.textContent = progress.message;
+        }
+        if (currentApi) {
+            currentApi.textContent = progress.current_api ? `当前接口：${progress.current_api}` : '';
+        }
+        // 完成后自动显示结果（如果后端已返回下载路径则按钮会可用）
+        if (progress.percentage >= 100 && progress.file_path) {
+            // 直接展示结果并提供下载
+            document.getElementById('generation-progress').style.display = 'none';
+            document.getElementById('generation-result').style.display = 'block';
+            document.getElementById('result-message').textContent = progress.message || 'API测试用例生成完成';
+            document.getElementById('download-link').href = `/download_file/?file_path=${encodeURIComponent(progress.file_path)}`;
         }
     }
 
