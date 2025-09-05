@@ -234,7 +234,8 @@ class APITestCaseGeneratorPrompt:
         self.prompt_template = self.prompt_manager.get_api_test_case_generator_prompt()
     
     def format_messages(self, api_info: Dict[str, Any], priority: str, 
-                       case_count: int, test_case_min_template: str) -> list:
+                       case_count: int, api_test_case_min_template: str, 
+                       include_format_instructions: bool = False) -> list:
         """格式化消息
         
         Args:
@@ -242,6 +243,7 @@ class APITestCaseGeneratorPrompt:
             priority: 测试用例优先级
             case_count: 生成测试用例数量
             test_case_template: 测试用例结构模板
+            include_format_instructions: 是否包含格式说明（用于重试）
             
         Returns:
             格式化后的消息列表
@@ -250,18 +252,36 @@ class APITestCaseGeneratorPrompt:
         response_summary = self._format_response_summary(api_info)
         response_block = f"## 响应摘要\n{response_summary}" if response_summary else ""
         
-        return self.prompt_template.format_messages(
+        # 获取基础消息
+        messages = self.prompt_template.format_messages(
             api_name=api_info.get('name', ''),
             method=api_info.get('method', ''),
             path=api_info.get('path', ''),
             priority=priority,
             case_count=case_count,
-            inter_parameters_info=self._format_inter_parameters_info(api_info),
-            inter_response_summary=response_block,
-            test_case_min_template=test_case_min_template
+            api_parameters_info=self._format_api_parameters_info(api_info),
+            api_response_summary=response_block,
+            api_test_case_min_template=api_test_case_min_template
         )
+        
+        # 如果需要格式说明（重试时），追加到最后一个 HumanMessage
+        if include_format_instructions:
+            from .parsers.api_test_case_parser import get_format_instructions
+            format_instr = get_format_instructions()
+            format_extra = f"\n\n重要要求：\n- 只输出 JSON，不要任何解释性文本\n- 严格遵守以下格式说明：\n{format_instr}"
+            
+            # 找到最后一个 HumanMessage 并追加格式说明
+            for msg in reversed(messages):
+                if hasattr(msg, 'content') and hasattr(msg, 'type') and msg.type == 'human':
+                    msg.content += format_extra
+                    break
+                elif hasattr(msg, 'content') and hasattr(msg, 'role') and msg.role == 'user':
+                    msg.content += format_extra
+                    break
+        
+        return messages
     
-    def _format_inter_parameters_info(self, api_info: Dict[str, Any]) -> str:
+    def _format_api_parameters_info(self, api_info: Dict[str, Any]) -> str:
         """格式化参数的关键信息"""
         request = api_info.get('request', {})
         
