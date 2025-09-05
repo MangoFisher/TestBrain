@@ -7,6 +7,10 @@ from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .prompts import APITestCaseGeneratorPrompt
 from ..llm.base import LLMServiceFactory
+from .parsers.api_test_case_parser import parse_minimal_cases_or_raise
+from .parsers.retry_utils import generate_with_retry
+
+from .progress_registry import set_progress
 
 logger = logging.getLogger(__name__)
 
@@ -81,17 +85,83 @@ class APITestCaseGeneratorAgent:
                                       priority: str, count: int) -> Optional[List[Dict[str, Any]]]:
         """为某个api接口一次生成多条测试用例（单次LLM调用返回数组）
         使用最小输出协议，仅让LLM生成差异字段，然后在本地合并为完整模板。
+        使用 Pydantic 解析和自动重试机制。
         """
-        import threading
-        thread_id = threading.current_thread().ident
         try:
-            # 使用最小生成模板构建提示
-            messages = self._build_messages_minimal(api_info, priority, count)
+            # 使用新的解析和重试机制
+            minimal_cases = self._generate_with_retry(api_info, priority, count)
+            if not minimal_cases:
+                return None
 
+            # 合并为完整用例
+            processed: List[Dict[str, Any]] = []
+            for mcase in minimal_cases:
+                try:
+                    # 将 Pydantic 对象转换为 dict
+                    mcase_dict = mcase.dict() if hasattr(mcase, 'dict') else mcase
+                    processed.append(self._merge_minimal_case_to_full_case(mcase_dict, api_info, priority))
+                except Exception as e:
+                    logger.error("合并最小用例失败: %s", e)
+            return processed
+        except Exception as e:
+            logger.error("生成多条测试用例失败: %s", e)
+            return None
+
+    
+
+    
+    
+    def _create_minimal_generation_template(self) -> Dict[str, Any]:
+        return {
+            "id": "TC-001",
+            "name": "用例名称(接口名称_测试点描述, ≤40字)",
+            "description": "用例描述(≤60字, 可选)",
+            "request_body_json": { 
+                "param_name": "要测试的参数名(如: isVirtually)",
+                "param_value": "测试用的参数值(如: 1)"     
+            },
+            "request_query": [
+                {
+                    "param_name": "要测试的参数名(如: pageSize)",
+                    "param_value": "测试用的参数值(如: 10)"
+                }
+            ],
+            "request_rest": [
+                {
+                    "param_name": "要测试的参数名(如: userCode)",
+                    "param_value": "测试用的参数值(如: oa1922897972947259394)"
+                }
+            ],
+            "assertion_condition": "断言条件, 根据测试参数是否全部正确或不正确, 取值只能为EQUALS或NOT_EQUALS"
+        }
+
+    def _build_messages_minimal(self, api_info: Dict[str, Any], priority: str, count: int, 
+                               include_format_instructions: bool = False) -> list:
+        minimal_template = self._create_minimal_generation_template()
+        return self.prompt.format_messages(
+            api_info=api_info,
+            priority=priority,
+            case_count=count,
+            api_test_case_min_template=json.dumps(minimal_template, ensure_ascii=False, indent=2),
+            include_format_instructions=include_format_instructions
+        )
+
+    def _generate_with_retry(self, api_info: Dict[str, Any], priority: str, count: int) -> Optional[List]:
+        """使用重试机制生成最小用例"""
+        
+        include_format_instructions = False  # 首次不带，重试时再带上
+
+        # 定义一次 LLM 调用函数
+        def call_llm_once():
+            messages = self._build_messages_minimal(
+                api_info, priority, count,
+                include_format_instructions=include_format_instructions
+            )
+            
             # 打印完整提示词
             try:
                 prompt_text = "\n\n".join([getattr(m, 'content', str(m)) for m in messages])
-                logger.info(f"[Thread-{thread_id}] [LLM Prompt-MULTI] API={api_info.get('name', '')} Count={count}\n{prompt_text}")
+                logger.info("[LLM Prompt-MULTI] API=%s Count=%s\n%s", api_info.get('name', ''), count, prompt_text)
             except Exception:
                 pass
 
@@ -114,255 +184,61 @@ class APITestCaseGeneratorAgent:
                         langchain_messages.append(msg)
                 invoke_result = self.llm.invoke(langchain_messages)
                 response = getattr(invoke_result, 'content', invoke_result)
-            logger.info(f"[Thread-{thread_id}] 大模型多用例原始响应: {response}")
-            minimal_cases = self._parse_response_to_test_cases(response)
-            if not minimal_cases:
-                return None
+            
+            logger.info("大模型多用例原始响应: %s", response)
+            return response
 
-            # 合并为完整用例
-            processed: List[Dict[str, Any]] = []
-            for mcase in minimal_cases:
-                try:
-                    processed.append(self._merge_minimal_case_to_full_case(mcase, api_info, priority))
-                except Exception as e:
-                    logger.error(f"[Thread-{thread_id}] 合并最小用例失败: {e}")
-            return processed
-        except Exception as e:
-            logger.error(f"[Thread-{thread_id}] 生成多条测试用例失败: {e}")
-            return None
+        # 定义重试时的回调（增强提示词）
+        def on_retry(attempt):
+            logger.warning("解析失败，第 %d 次重试，增强格式约束", attempt + 1)
+            # 重试时减少生成数量，提高成功率
+            nonlocal count
+            count = max(1, count // 2)
+            # 从下一次开始追加严格的格式说明
+            nonlocal include_format_instructions
+            include_format_instructions = True
 
-    
-
-    def _parse_response_to_test_cases(self, response: Any) -> Optional[List[Dict[str, Any]]]:
-        """解析大模型响应为测试用例列表（支持数组或单对象容错）"""
+        # 执行重试生成
         try:
-            if not isinstance(response, str):
-                response = getattr(response, 'content', str(response))
-            clean_response = response.strip()
-            if clean_response.startswith('```json'):
-                clean_response = clean_response[7:]
-            if clean_response.endswith('```'):
-                clean_response = clean_response[:-3]
-            clean_response = clean_response.strip()
-            parsed = json.loads(clean_response)
-            if isinstance(parsed, list):
-                return [p for p in parsed if isinstance(p, dict)]
-            if isinstance(parsed, dict):
-                return [parsed]
+            return generate_with_retry(
+                call_llm=call_llm_once,
+                parse_cases=parse_minimal_cases_or_raise,
+                on_retry=on_retry,
+                max_retries=2
+            )
+        except Exception as e:
+            logger.error("重试后仍失败: %s", e)
             return None
-        except json.JSONDecodeError as e:
-            logger.error(f"解析多用例响应失败: {e}")
-            return None
-    
-    
-    def _create_minimal_generation_template(self) -> Dict[str, Any]:
-        return {
-            "id": "TC-001",
-            "name": "用例名称(接口名称_测试点描述, ≤40字)",
-            "description": "用例描述(≤60字, 可选)",
-            "request_body_json": {},
-            "request_query": [
-                {
-                    "param_name": "要测试的参数名(如: pageSize)",
-                    "param_value": "测试用的参数值(如: 10)"
-                }
-            ],
-            "request_rest": [
-                {
-                    "param_name": "要测试的参数名(如: userCode)",
-                    "param_value": "测试用的参数值(如: oa1922897972947259394)"
-                }
-            ],
-            "assertions": [
-                {
-                    "assertionType": "RESPONSE_BODY",
-                    "enable": True,
-                    "name": "响应体",
-                    "id": "USER_SET",
-                    "projectId": None,
-                    "assertionBodyType": "JSON_PATH",
-                    "jsonPathAssertion": {
-                        "assertions": [
-                            {
-                                "enable": True,
-                                "expression": "code",
-                                "condition": "EQUALS",
-                                "expectedValue": "10000",
-                                "valid": True
-                            }
-                        ]
-                    },
-                    "xpathAssertion": {
-                        "responseFormat": "XML",
-                        "assertions": []
-                    },
-                    "documentAssertion": None,
-                    "regexAssertion": {
-                        "assertions": []
-                    },
-                    "bodyAssertionClassByType": "io.metersphere.project.api.assertion.body.MsJSONPathAssertion",
-                    "bodyAssertionDataByType": {
-                        "assertions": [
-                            {
-                                "enable": True,
-                                "expression": "code",
-                                "condition": "EQUALS",
-                                "expectedValue": "10000",
-                                "valid": True
-                            }
-                        ]
-                    }
-                }
-            ]
-        }
-
-    def _build_messages_minimal(self, api_info: Dict[str, Any], priority: str, count: int) -> list:
-        minimal_template = self._create_minimal_generation_template()
-        return self.prompt.format_messages(
-            api_info=api_info,
-            priority=priority,
-            case_count=count,
-            test_case_min_template=json.dumps(minimal_template, ensure_ascii=False, indent=2)
-        )
 
     def _merge_minimal_case_to_full_case(self, minimal_case: Dict[str, Any], api_info: Dict[str, Any], priority: str) -> Dict[str, Any]:
         '''使用模版文件中定义的测试用例模版结构, 并将大模型生成的参数、断言回填到模版中, 构成一个合法的测试用例'''
         full_case = copy.deepcopy(self.test_case_full_template)
-        full_case['request'] = copy.deepcopy(api_info.get('request')) # 直接复用接口定义中的request结构, 参数和断言部分由大模型生成后回填
+        # 1.直接复用接口定义中的request结构, 参数和断言部分由大模型生成后回填
+        full_case['request'] = copy.deepcopy(api_info.get('request')) 
 
         req = full_case.get('request')
         child0 = req['children'][0]
 
-        # 代码手动填充
-        ts = int(time.time() * 1000)
+        # 2.填充用户设置的用例优先级和代码中设置的用例标签
         full_case['priority'] = priority
         full_case['tags'] = ['TestBrain']
 
-        # LLM 差异字段
-        name = minimal_case.get('name') or '自动化测试用例'
+        # 3.填充用例名称
+        name = minimal_case.get('name') or 'TestBrain生成的用例'
         full_case['name'] = name
         full_case['request']['name'] = name
 
-        # 将需要大模型生成的字段应用到full_case中
+        # 4.将需要大模型生成的参数回填到full_case中的request字段
         self._apply_minimal_request_overrides(full_case, minimal_case, api_info)
 
-        raw_assertions = minimal_case.get('assertions', [])
-        valid_assertions = self._normalize_and_validate_assertions(raw_assertions)
-        for idx, a in enumerate(valid_assertions):
-            a['id'] = f"{ts}"  # 生成每个断言中的id字段
-        child0['assertionConfig']['assertions'] = valid_assertions
+        # 5. 后端固定生成断言，只使用 LLM 的 condition
+        assertion_condition = minimal_case.get('assertion_condition', 'EQUALS')
+        fixed_assertion = self._generate_fixed_assertion(assertion_condition)
+        
+        child0['assertionConfig']['assertions'] = [fixed_assertion]
 
         return full_case
 
-    def _normalize_and_validate_assertions(self, assertions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        result: List[Dict[str, Any]] = []
-        if not isinstance(assertions, list):
-            return result
-
-        for a in assertions:
-            atype = a.get('assertionType')
-            aname = a.get('name')
-
-            # 仅当名称与类型对应时继续
-            if atype == 'RESPONSE_CODE' and aname != '状态码':
-                continue
-            if atype == 'RESPONSE_HEADER' and aname != '响应头':
-                continue
-            if atype == 'RESPONSE_BODY' and aname != '响应体':
-                continue
-
-            if atype == 'RESPONSE_CODE':
-                cond = a.get('condition')
-                if cond not in ('EQUALS', 'NOT_EQUALS'):
-                    continue
-                expected = str(a.get('expectedValue', '200'))
-                item = {
-                    'assertionType': 'RESPONSE_CODE',
-                    'enable': True,
-                    'name': '状态码',
-                    'id': int(time.time()*1000),
-                    'projectId': None,
-                    'condition': cond,
-                    'expectedValue': expected
-                }
-                result.append(item)
-
-            elif atype == 'RESPONSE_HEADER':
-                sub = a.get('assertions', [])
-                if not sub or not isinstance(sub, list):
-                    continue
-                s0 = sub[0]
-                cond = s0.get('condition')
-                if cond not in ('EQUALS', 'NOT_EQUALS'):
-                    continue
-                item = {
-                    'assertionType': 'RESPONSE_HEADER',
-                    'enable': True,
-                    'name': '响应头',
-                    'id': int(time.time()*1000),
-                    'projectId': None,
-                    'assertions': [{
-                        'enable': True,
-                        'header': s0.get('header', 'Content-Type'),
-                        'condition': cond,
-                        'expectedValue': s0.get('expectedValue', 'application/json')
-                    }]
-                }
-                result.append(item)
-
-            elif atype == 'RESPONSE_BODY':
-                body_type = a.get('assertionBodyType', 'JSON_PATH')
-                if body_type != 'JSON_PATH':
-                    continue
-                jpa = a.get('jsonPathAssertion', {}).get('assertions', [])
-                if not jpa or not isinstance(jpa, list):
-                    continue
-                jp0 = jpa[0]
-                cond = jp0.get('condition')
-                if cond not in ('EQUALS', 'NOT_EQUALS'):
-                    continue
-                item = {
-                    'assertionType': 'RESPONSE_BODY',
-                    'enable': True,
-                    'name': '响应体',
-                    'id': int(time.time()*1000),
-                    'projectId': None,
-                    'assertionBodyType': 'JSON_PATH',
-                    'jsonPathAssertion': {
-                        'assertions': [{
-                            'enable': True,
-                            'expression': jp0.get('expression', 'code'),
-                            'condition': cond,
-                            'expectedValue': jp0.get('expectedValue', '10000'),
-                            'valid': True
-                        }]
-                    },
-                    'xpathAssertion': {'responseFormat': 'XML', 'assertions': []},
-                    'documentAssertion': None,
-                    'regexAssertion': {'assertions': []},
-                    'bodyAssertionClassByType': 'io.metersphere.project.api.assertion.body.MsJSONPathAssertion',
-                    'bodyAssertionDataByType': {
-                        'assertions': [{
-                            'enable': True,
-                            'expression': jp0.get('expression', 'code'),
-                            'condition': cond,
-                            'expectedValue': jp0.get('expectedValue', '10000'),
-                            'valid': True
-                        }]
-                    }
-                }
-                result.append(item)
-
-        if not result:
-            result.append({
-                'assertionType': 'RESPONSE_CODE',
-                'enable': True,
-                'name': '状态码',
-                'projectId': None,
-                'condition': 'EQUALS',
-                'expectedValue': '200'
-            })
-        return result
 
     def _apply_minimal_request_overrides(self, full_case: Dict[str, Any], minimal_case: Dict[str, Any], api_info: Dict[str, Any]) -> None:
         """将 LLM 生成的差异值应用到 request（body/query/rest），同时同步API定义中的类型信息"""
@@ -448,9 +324,17 @@ class APITestCaseGeneratorAgent:
 
     def generate_test_cases_for_apis_batch(self, api_definitions: List[Dict], 
                                        selected_apis: List[str], count_per_api: int, 
-                                       priority: str) -> Dict:
+                                       priority: str, task_id: Optional[str] = None) -> Dict:
         """批量生成测试用例（多线程生成，主线程合并）"""
         try:
+            if not task_id:
+                task_id = f"task_{int(time.time()*1000)}"
+            # step 1
+            set_progress(task_id, {
+                'step': 1,
+                'message': '解析API定义文件',
+                'percentage': 10
+            })
             # 建立 path -> api_def 的索引，便于快速定位
             path_to_api: Dict[str, Dict[str, Any]] = {}
             for api in api_definitions:
@@ -461,16 +345,35 @@ class APITestCaseGeneratorAgent:
             # 过滤有效的选择（根据文件中实际存在的 path）
             valid_paths = [p for p in selected_apis if p in path_to_api]
             if not valid_paths:
+                set_progress(task_id, {
+                    'step': -1,
+                    'message': '未找到有效的接口路径',
+                    'percentage': 0
+                })
                 return {
                     'success': False,
                     'message': '未找到有效的接口路径',
                 }
 
+            # step 2
+            set_progress(task_id, {
+                'step': 2,
+                'message': '验证接口参数',
+                'percentage': 20
+            })
             logger.info(f"开始并发生成。选中接口数: {len(valid_paths)}，每个接口生成: {count_per_api} 条")
 
             # 子线程只负责生成，不改动 api_definitions
             results_by_path: Dict[str, List[Dict[str, Any]]] = {p: [] for p in valid_paths}
 
+            # step 3
+            set_progress(task_id, {
+                'step': 3,
+                'message': '调用大模型生成用例',
+                'percentage': 30,
+                'total_apis': len(valid_paths),
+                'completed_apis': 0
+            })
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 future_to_path = {}
                 for api_path in valid_paths:
@@ -478,15 +381,33 @@ class APITestCaseGeneratorAgent:
                     fut = executor.submit(self._generate_cases_for_single_api, api_def, priority, count_per_api)
                     future_to_path[fut] = (api_path, api_def.get('name', ''))
 
+                completed = 0
                 for fut in as_completed(future_to_path):
                     api_path, api_name = future_to_path[fut]
                     try:
                         cases = fut.result() or []
                         results_by_path[api_path].extend(cases)
+                        completed += 1
+                        percent = 30 + int((completed * 50) / max(1, len(valid_paths)))
+                        set_progress(task_id, {
+                            'step': 3,
+                            'message': f'正在处理接口: {api_name}',
+                            'percentage': percent,
+                            'current_api': api_name,
+                            'total_apis': len(valid_paths),
+                            'completed_apis': completed
+                        })
                         logger.info(f"接口生成完成: {api_name} - 新增用例 {len(cases)} 条")
                     except Exception as e:
+                        completed += 1
                         logger.error(f"接口生成异常: {api_name}: {e}")
 
+            # step 4
+            set_progress(task_id, {
+                'step': 4,
+                'message': '合并测试用例',
+                'percentage': 80
+            })
             # 主线程合并结果到 api_definitions
             total_cases = 0
             for api_path, cases in results_by_path.items():
@@ -496,11 +417,14 @@ class APITestCaseGeneratorAgent:
                 api_def['apiTestCaseList'].extend(cases)
                 total_cases += len(cases)
 
+            # step 5: 最终 100% 由外层写回文件后统一写入，避免多源
+            logger.info(f"合并完成，共为 {len(results_by_path)} 个接口合并了 {total_cases} 条测试用例")
             return {
                 'success': True,
                 'message': f'成功为{len(valid_paths)}个接口新增生成了测试用例，共 {total_cases} 条',
                 'generated_cases': total_cases,
-                'selected_api_count': len(valid_paths)
+                'selected_api_count': len(valid_paths),
+                'task_id': task_id
             }
 
         except Exception as e:
@@ -512,79 +436,54 @@ class APITestCaseGeneratorAgent:
 
     def _generate_cases_for_single_api(self, api_def: Dict[str, Any], priority: str, count_per_api: int) -> List[Dict[str, Any]]:
         """为单个接口一次性生成多条测试用例（按接口并发，单次LLM调用）"""
-        import threading
-        thread_id = threading.current_thread().ident
         api_name = api_def.get('name', '')
         try:
             # 保护性判断：无参数则不调用模型
             if not self._has_request_parameters(api_def):
-                logger.info(f"[Thread-{thread_id}] 接口query、rest、body均无请求参数, 跳过LLM生成用例: {api_name}")
+                logger.info("接口 query、rest、body 均无请求参数，跳过 LLM 生成用例：%s", api_name)
                 return []
             cases = self._generate_multiple_test_cases(api_def, priority, count_per_api) or []
-            logger.info(f"[Thread-{thread_id}] 接口生成完成: {api_name} - 新增用例 {len(cases)} 条")
+            logger.info("接口生成完成: %s - 新增用例 %d 条", api_name, len(cases))
             return cases
         except Exception as e:
-            logger.error(f"[Thread-{thread_id}] 接口多用例生成异常: {api_name}: {e}")
+            logger.error("接口多用例生成异常: %s: %s", api_name, e)
             return []
 
-    def _get_default_assertion(self):
-        """获取默认断言"""
+    def _generate_fixed_assertion(self, condition: str) -> Dict[str, Any]:
+        """后端固定生成断言结构，只让 LLM 决定 condition"""
+        ts = int(time.time() * 1000)
         return {
-            "assertionType": "RESPONSE_CODE",
+            "assertionType": "RESPONSE_BODY",
             "enable": True,
-            "name": "默认状态码验证",
-            "id": "default_status_code",
+            "name": "响应体",
+            "id": f"{ts}",
             "projectId": None,
-            "condition": "EQUALS",
-            "expectedValue": "200"
+            "assertionBodyType": "JSON_PATH",
+            "jsonPathAssertion": {
+                "assertions": [{
+                    "enable": True,
+                    "expression": "code",
+                    "condition": condition,
+                    "expectedValue": "10000",
+                    "valid": True
+                }]
+            },
+            "xpathAssertion": {"responseFormat": "XML", "assertions": []},
+            "documentAssertion": None,
+            "regexAssertion": {"assertions": []},
+            "bodyAssertionClassByType": "io.metersphere.project.api.assertion.body.MsJSONPathAssertion",
+            "bodyAssertionDataByType": {
+                "assertions": [{
+                    "enable": True,
+                    "expression": "code",
+                    "condition": condition,
+                    "expectedValue": "10000",
+                    "valid": True
+                }]
+            }
         }
-    
-    def _validate_assertions(self, test_case):
-        """验证大模型生成的断言结构"""
-        allowed_types = ['RESPONSE_CODE', 'RESPONSE_HEADER', 'RESPONSE_BODY', 'VARIABLE', 'SCRIPT']
-        
-        if 'request' in test_case and 'children' in test_case['request']:
-            for child in test_case['request']['children']:
-                if 'assertionConfig' in child and 'assertions' in child['assertionConfig']:
-                    assertions = child['assertionConfig']['assertions']
-                    valid_assertions = []
-                    
-                    for assertion in assertions:
-                        assertion_type = assertion.get('assertionType')
-                        if assertion_type not in allowed_types:
-                            logger.warning(f"不支持的断言类型: {assertion_type}，将跳过此断言")
-                            continue
-                        
-                        # 验证断言结构的完整性
-                        if self._validate_assertion_structure(assertion, assertion_type):
-                            valid_assertions.append(assertion)
-                        else:
-                            logger.warning(f"断言结构不完整: {assertion_type}")
-                    
-                    # 更新为验证后的断言
-                    child['assertionConfig']['assertions'] = valid_assertions
-                    
-                    # 如果没有有效断言，添加默认断言
-                    if not valid_assertions:
-                        logger.info("未找到有效断言，添加默认状态码断言")
-                        child['assertionConfig']['assertions'] = [self._get_default_assertion()]
 
-    def _validate_assertion_structure(self, assertion, assertion_type):
-        """验证特定类型断言的结构完整性"""
-        if assertion_type == 'RESPONSE_CODE':
-            required_fields = ['enable', 'name', 'condition', 'expectedValue']
-        elif assertion_type == 'RESPONSE_HEADER':
-            required_fields = ['enable', 'name', 'assertions']
-        elif assertion_type == 'RESPONSE_BODY':
-            required_fields = ['enable', 'name', 'assertionBodyType', 'jsonPathAssertion']
-        elif assertion_type == 'VARIABLE':
-            required_fields = ['enable', 'name', 'variableAssertionItems']
-        elif assertion_type == 'SCRIPT':
-            required_fields = ['enable', 'name', 'script', 'scriptLanguage']
-        else:
-            return False
-        
-        return all(field in assertion for field in required_fields)
+    
 
 
 def parse_api_definitions(file_path: str) -> List[Dict]:
@@ -611,7 +510,7 @@ def parse_api_definitions(file_path: str) -> List[Dict]:
 
 
 def generate_test_cases_for_apis(file_path: str, selected_apis: list, count_per_api: int, 
-                                 priority: str, llm_provider: str) -> Dict:
+                                 priority: str, llm_provider: str, task_id: Optional[str] = None) -> Dict:
     """为选中的API生成测试用例"""
     try:
         # 读取原文件
@@ -623,13 +522,24 @@ def generate_test_cases_for_apis(file_path: str, selected_apis: list, count_per_
         
         # 批量生成测试用例
         result = agent.generate_test_cases_for_apis_batch(
-            data['apiDefinitions'], selected_apis, count_per_api, priority
+            data['apiDefinitions'], selected_apis, count_per_api, priority, task_id
         )
         
         if result['success']:
             # 写回文件
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
+            # 在进度中补充最终下载路径
+            if task_id:
+                try:
+                    set_progress(task_id, {
+                        'step': 5,
+                        'message': result.get('message', '生成完成'),
+                        'percentage': 100,
+                        'file_path': file_path
+                    })
+                except Exception:
+                    pass
         
         return result
         

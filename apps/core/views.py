@@ -10,6 +10,7 @@ from ..agents.generator import TestCaseGeneratorAgent
 from ..agents.reviewer import TestCaseReviewerAgent
 from ..agents.analyser import PrdAnalyserAgent
 from ..agents.api_case_generator import APITestCaseGeneratorAgent, parse_api_definitions, generate_test_cases_for_apis
+from ..agents.progress_registry import get_progress as get_task_progress
 from ..knowledge.service import KnowledgeService
 
 # 初始化服务
@@ -23,6 +24,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import os
 from datetime import datetime
+import time
 from .milvus_helper import get_embedding_model, init_milvus_collection, process_singel_file
 from langchain.text_splitter import CharacterTextSplitter
 import hashlib
@@ -926,17 +928,26 @@ def api_case_generate(request):
             count_per_api = int(request.POST.get('count_per_api', 1))
             priority = request.POST.get('priority', 'P0')
             llm_provider = request.POST.get('llm_provider', 'deepseek')
+            # 任务ID（前端可传入；若没有则后端生成）
+            task_id = request.POST.get('task_id') or f"task_{int(time.time()*1000)}_{request.user.id if request.user.is_authenticated else 'anon'}"
             
-            # 生成测试用例
-            result = generate_test_cases_for_apis(
-                file_path, selected_apis, count_per_api, priority, llm_provider
-            )
+            # 后台线程异步生成，立即返回
+            import threading
+            def _bg_job():
+                try:
+                    generate_test_cases_for_apis(
+                        file_path, selected_apis, count_per_api, priority, llm_provider, task_id
+                    )
+                except Exception as e:
+                    logger.error(f"后台生成失败: {e}")
+            t = threading.Thread(target=_bg_job, name=f"gen-{task_id}")
+            t.daemon = True
+            t.start()
             
-            # 在返回结果中添加 file_path 字段，以便前端下载
-            if result.get('success'):
-                result['file_path'] = file_path
-            
-            return JsonResponse(result)
+            return JsonResponse({
+                'success': True,
+                'task_id': task_id
+            })
         
         else:
             return JsonResponse({
@@ -950,4 +961,18 @@ def api_case_generate(request):
     })
 
 
+def get_generation_progress_api(request):
+    """进度查询：根据 task_id 返回内存注册表中的进度"""
+    try:
+        task_id = request.GET.get('task_id')
+        if not task_id:
+            return JsonResponse({'success': False, 'message': '缺少 task_id'})
+        progress = get_task_progress(task_id)
+        if not progress:
+            return JsonResponse({'success': False, 'message': '未找到进度信息'})
+        return JsonResponse({'success': True, 'progress': progress})
+    except Exception as e:
+        logger.error(f"获取进度失败: {e}")
+        return JsonResponse({'success': False, 'message': str(e)})
+    
     
