@@ -59,8 +59,8 @@ class MinimalCase(BaseModel):
     # query / rest 差异（只包含 param_name / param_value）
     request_query: List[MinimalRequestQueryParam] = Field(default_factory=list)
     request_rest: List[MinimalRequestRestParam] = Field(default_factory=list)
-    # 断言列表（只允许 RESPONSE_BODY）
-    assertions: List[ResponseBodyAssertion] = Field(default_factory=list)
+    # 简化为只输出断言条件
+    assertion_condition: Literal['EQUALS', 'NOT_EQUALS'] = 'EQUALS'
 
     # 说明：此前使用的 @validator 被移除。该校验点在模型中通过更严格的类型定义
     # 已自然保证（断言类型只建模为 ResponseBodyAssertion）。

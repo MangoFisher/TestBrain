@@ -107,26 +107,6 @@ class APITestCaseGeneratorAgent:
 
     
 
-    def _parse_response_to_test_cases(self, response: Any) -> Optional[List[Dict[str, Any]]]:
-        """解析大模型响应为测试用例列表（支持数组或单对象容错）"""
-        try:
-            if not isinstance(response, str):
-                response = getattr(response, 'content', str(response))
-            clean_response = response.strip()
-            if clean_response.startswith('```json'):
-                clean_response = clean_response[7:]
-            if clean_response.endswith('```'):
-                clean_response = clean_response[:-3]
-            clean_response = clean_response.strip()
-            parsed = json.loads(clean_response)
-            if isinstance(parsed, list):
-                return [p for p in parsed if isinstance(p, dict)]
-            if isinstance(parsed, dict):
-                return [parsed]
-            return None
-        except json.JSONDecodeError as e:
-            logger.error(f"解析多用例响应失败: {e}")
-            return None
     
     
     def _create_minimal_generation_template(self) -> Dict[str, Any]:
@@ -150,47 +130,7 @@ class APITestCaseGeneratorAgent:
                     "param_value": "测试用的参数值(如: oa1922897972947259394)"
                 }
             ],
-            "assertions": [
-                {
-                    "assertionType": "RESPONSE_BODY",
-                    "enable": True,
-                    "name": "响应体",
-                    "id": "USER_SET",
-                    "projectId": None,
-                    "assertionBodyType": "JSON_PATH",
-                    "jsonPathAssertion": {
-                        "assertions": [
-                            {
-                                "enable": True,
-                                "expression": "code",
-                                "condition": "EQUALS",
-                                "expectedValue": "10000",
-                                "valid": True
-                            }
-                        ]
-                    },
-                    "xpathAssertion": {
-                        "responseFormat": "XML",
-                        "assertions": []
-                    },
-                    "documentAssertion": None,
-                    "regexAssertion": {
-                        "assertions": []
-                    },
-                    "bodyAssertionClassByType": "io.metersphere.project.api.assertion.body.MsJSONPathAssertion",
-                    "bodyAssertionDataByType": {
-                        "assertions": [
-                            {
-                                "enable": True,
-                                "expression": "code",
-                                "condition": "EQUALS",
-                                "expectedValue": "10000",
-                                "valid": True
-                            }
-                        ]
-                    }
-                }
-            ]
+            "assertion_condition": "断言条件, 根据测试参数是否全部正确或不正确, 取值只能为EQUALS或NOT_EQUALS"
         }
 
     def _build_messages_minimal(self, api_info: Dict[str, Any], priority: str, count: int, 
@@ -207,7 +147,7 @@ class APITestCaseGeneratorAgent:
     def _generate_with_retry(self, api_info: Dict[str, Any], priority: str, count: int) -> Optional[List]:
         """使用重试机制生成最小用例"""
         
-        include_format_instructions = True  # 首次不带，重试时再带上
+        include_format_instructions = False  # 首次不带，重试时再带上
 
         # 定义一次 LLM 调用函数
         def call_llm_once():
@@ -289,126 +229,14 @@ class APITestCaseGeneratorAgent:
         # 4.将需要大模型生成的参数回填到full_case中的request字段
         self._apply_minimal_request_overrides(full_case, minimal_case, api_info)
 
-        raw_assertions = minimal_case.get('assertions', [])
-        valid_assertions = self._normalize_and_validate_assertions(raw_assertions)
-        ts = int(time.time() * 1000)
-        for idx, a in enumerate(valid_assertions):
-            a['id'] = f"{ts}"  # 生成每个断言中的id字段
-
-        # 5.将大模型生成的断言回填到full_case中的request中的assertionConfig字段
-        child0['assertionConfig']['assertions'] = valid_assertions
+        # 5. 后端固定生成断言，只使用 LLM 的 condition
+        assertion_condition = minimal_case.get('assertion_condition', 'EQUALS')
+        fixed_assertion = self._generate_fixed_assertion(assertion_condition)
+        
+        child0['assertionConfig']['assertions'] = [fixed_assertion]
 
         return full_case
 
-    def _normalize_and_validate_assertions(self, assertions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        result: List[Dict[str, Any]] = []
-        if not isinstance(assertions, list):
-            return result
-
-        for a in assertions:
-            atype = a.get('assertionType')
-            aname = a.get('name')
-
-            # 仅当名称与类型对应时继续
-            if atype == 'RESPONSE_CODE' and aname != '状态码':
-                continue
-            if atype == 'RESPONSE_HEADER' and aname != '响应头':
-                continue
-            if atype == 'RESPONSE_BODY' and aname != '响应体':
-                continue
-
-            if atype == 'RESPONSE_CODE':
-                cond = a.get('condition')
-                if cond not in ('EQUALS', 'NOT_EQUALS'):
-                    continue
-                expected = str(a.get('expectedValue', '200'))
-                item = {
-                    'assertionType': 'RESPONSE_CODE',
-                    'enable': True,
-                    'name': '状态码',
-                    'id': int(time.time()*1000),
-                    'projectId': None,
-                    'condition': cond,
-                    'expectedValue': expected
-                }
-                result.append(item)
-
-            elif atype == 'RESPONSE_HEADER':
-                sub = a.get('assertions', [])
-                if not sub or not isinstance(sub, list):
-                    continue
-                s0 = sub[0]
-                cond = s0.get('condition')
-                if cond not in ('EQUALS', 'NOT_EQUALS'):
-                    continue
-                item = {
-                    'assertionType': 'RESPONSE_HEADER',
-                    'enable': True,
-                    'name': '响应头',
-                    'id': int(time.time()*1000),
-                    'projectId': None,
-                    'assertions': [{
-                        'enable': True,
-                        'header': s0.get('header', 'Content-Type'),
-                        'condition': cond,
-                        'expectedValue': s0.get('expectedValue', 'application/json')
-                    }]
-                }
-                result.append(item)
-
-            elif atype == 'RESPONSE_BODY':
-                body_type = a.get('assertionBodyType', 'JSON_PATH')
-                if body_type != 'JSON_PATH':
-                    continue
-                jpa = a.get('jsonPathAssertion', {}).get('assertions', [])
-                if not jpa or not isinstance(jpa, list):
-                    continue
-                jp0 = jpa[0]
-                cond = jp0.get('condition')
-                if cond not in ('EQUALS', 'NOT_EQUALS'):
-                    continue
-                item = {
-                    'assertionType': 'RESPONSE_BODY',
-                    'enable': True,
-                    'name': '响应体',
-                    'id': int(time.time()*1000),
-                    'projectId': None,
-                    'assertionBodyType': 'JSON_PATH',
-                    'jsonPathAssertion': {
-                        'assertions': [{
-                            'enable': True,
-                            'expression': jp0.get('expression', 'code'),
-                            'condition': cond,
-                            'expectedValue': jp0.get('expectedValue', '10000'),
-                            'valid': True
-                        }]
-                    },
-                    'xpathAssertion': {'responseFormat': 'XML', 'assertions': []},
-                    'documentAssertion': None,
-                    'regexAssertion': {'assertions': []},
-                    'bodyAssertionClassByType': 'io.metersphere.project.api.assertion.body.MsJSONPathAssertion',
-                    'bodyAssertionDataByType': {
-                        'assertions': [{
-                            'enable': True,
-                            'expression': jp0.get('expression', 'code'),
-                            'condition': cond,
-                            'expectedValue': jp0.get('expectedValue', '10000'),
-                            'valid': True
-                        }]
-                    }
-                }
-                result.append(item)
-
-        if not result:
-            result.append({
-                'assertionType': 'RESPONSE_CODE',
-                'enable': True,
-                'name': '状态码',
-                'projectId': None,
-                'condition': 'EQUALS',
-                'expectedValue': '200'
-            })
-        return result
 
     def _apply_minimal_request_overrides(self, full_case: Dict[str, Any], minimal_case: Dict[str, Any], api_info: Dict[str, Any]) -> None:
         """将 LLM 生成的差异值应用到 request（body/query/rest），同时同步API定义中的类型信息"""
@@ -542,6 +370,7 @@ class APITestCaseGeneratorAgent:
                 api_def['apiTestCaseList'].extend(cases)
                 total_cases += len(cases)
 
+            logger.info(f"合并完成，共为 {len(results_by_path)} 个接口合并了 {total_cases} 条测试用例")
             return {
                 'success': True,
                 'message': f'成功为{len(valid_paths)}个接口新增生成了测试用例，共 {total_cases} 条',
@@ -571,64 +400,41 @@ class APITestCaseGeneratorAgent:
             logger.error("接口多用例生成异常: %s: %s", api_name, e)
             return []
 
-    def _get_default_assertion(self):
-        """获取默认断言"""
+    def _generate_fixed_assertion(self, condition: str) -> Dict[str, Any]:
+        """后端固定生成断言结构，只让 LLM 决定 condition"""
+        ts = int(time.time() * 1000)
         return {
-            "assertionType": "RESPONSE_CODE",
+            "assertionType": "RESPONSE_BODY",
             "enable": True,
-            "name": "默认状态码验证",
-            "id": "default_status_code",
+            "name": "响应体",
+            "id": f"{ts}",
             "projectId": None,
-            "condition": "EQUALS",
-            "expectedValue": "200"
+            "assertionBodyType": "JSON_PATH",
+            "jsonPathAssertion": {
+                "assertions": [{
+                    "enable": True,
+                    "expression": "code",
+                    "condition": condition,
+                    "expectedValue": "10000",
+                    "valid": True
+                }]
+            },
+            "xpathAssertion": {"responseFormat": "XML", "assertions": []},
+            "documentAssertion": None,
+            "regexAssertion": {"assertions": []},
+            "bodyAssertionClassByType": "io.metersphere.project.api.assertion.body.MsJSONPathAssertion",
+            "bodyAssertionDataByType": {
+                "assertions": [{
+                    "enable": True,
+                    "expression": "code",
+                    "condition": condition,
+                    "expectedValue": "10000",
+                    "valid": True
+                }]
+            }
         }
-    
-    def _validate_assertions(self, test_case):
-        """验证大模型生成的断言结构"""
-        allowed_types = ['RESPONSE_CODE', 'RESPONSE_HEADER', 'RESPONSE_BODY', 'VARIABLE', 'SCRIPT']
-        
-        if 'request' in test_case and 'children' in test_case['request']:
-            for child in test_case['request']['children']:
-                if 'assertionConfig' in child and 'assertions' in child['assertionConfig']:
-                    assertions = child['assertionConfig']['assertions']
-                    valid_assertions = []
-                    
-                    for assertion in assertions:
-                        assertion_type = assertion.get('assertionType')
-                        if assertion_type not in allowed_types:
-                            logger.warning(f"不支持的断言类型: {assertion_type}，将跳过此断言")
-                            continue
-                        
-                        # 验证断言结构的完整性
-                        if self._validate_assertion_structure(assertion, assertion_type):
-                            valid_assertions.append(assertion)
-                        else:
-                            logger.warning(f"断言结构不完整: {assertion_type}")
-                    
-                    # 更新为验证后的断言
-                    child['assertionConfig']['assertions'] = valid_assertions
-                    
-                    # 如果没有有效断言，添加默认断言
-                    if not valid_assertions:
-                        logger.info("未找到有效断言，添加默认状态码断言")
-                        child['assertionConfig']['assertions'] = [self._get_default_assertion()]
 
-    def _validate_assertion_structure(self, assertion, assertion_type):
-        """验证特定类型断言的结构完整性"""
-        if assertion_type == 'RESPONSE_CODE':
-            required_fields = ['enable', 'name', 'condition', 'expectedValue']
-        elif assertion_type == 'RESPONSE_HEADER':
-            required_fields = ['enable', 'name', 'assertions']
-        elif assertion_type == 'RESPONSE_BODY':
-            required_fields = ['enable', 'name', 'assertionBodyType', 'jsonPathAssertion']
-        elif assertion_type == 'VARIABLE':
-            required_fields = ['enable', 'name', 'variableAssertionItems']
-        elif assertion_type == 'SCRIPT':
-            required_fields = ['enable', 'name', 'script', 'scriptLanguage']
-        else:
-            return False
-        
-        return all(field in assertion for field in required_fields)
+    
 
 
 def parse_api_definitions(file_path: str) -> List[Dict]:
