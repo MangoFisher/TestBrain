@@ -161,8 +161,10 @@ class LogManager:
         task_filter = TaskContextFilter()
         root_logger.addFilter(task_filter)
         mirror_handler = ProgressMirrorHandler(level=self.log_level)
-        # 简洁格式，避免过长
-        mirror_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        # 与控制台/文件一致并额外携带 task_id，便于前端排查
+        mirror_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - [thread=%(thread)d %(threadName)s] - [task_id=%(task_id)s] - %(message)s'
+        ))
         root_logger.addHandler(mirror_handler)
     
     def _get_logger(self, name):
