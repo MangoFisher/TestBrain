@@ -240,9 +240,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const priority = document.getElementById('priority').value;
         const llmProvider = document.getElementById('llm-provider').value;
         
-        // 显示进度界面
+        // 显示进度界面和日志区域
         document.getElementById('api-selection').style.display = 'none';
         document.getElementById('generation-progress').style.display = 'block';
+        document.getElementById('live-logs').style.display = 'block';
         
         // 发送生成请求
         generateTestCases(selectedApis, countPerApi, priority, llmProvider);
@@ -366,6 +367,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const bar = document.getElementById('progress-bar');
         const text = document.getElementById('progress-text');
         const currentApi = document.getElementById('current-api');
+        const logsBox = document.getElementById('live-logs');
+        
         if (bar && typeof progress.percentage === 'number') {
             bar.style.width = progress.percentage + '%';
         }
@@ -375,13 +378,50 @@ document.addEventListener('DOMContentLoaded', function() {
         if (currentApi) {
             currentApi.textContent = progress.current_api ? `当前接口：${progress.current_api}` : '';
         }
+        if (logsBox && Array.isArray(progress.logs)) {
+            logsBox.innerHTML = progress.logs.map(l => `<div>${formatLogEntry(l)}</div>`).join('');
+            logsBox.scrollTop = logsBox.scrollHeight;
+        }
         // 完成后自动显示结果（如果后端已返回下载路径则按钮会可用）
         if (progress.percentage >= 100 && progress.file_path) {
-            // 直接展示结果并提供下载
-            document.getElementById('generation-progress').style.display = 'none';
+            // 隐藏进度条相关元素
+            document.getElementById('progress-bar').style.display = 'none';
+            document.getElementById('progress-text').style.display = 'none';
+            document.getElementById('current-api').style.display = 'none';
+            
+            // 隐藏进度区域的标题
+            const progressTitle = document.querySelector('#generation-progress h3');
+            if (progressTitle) {
+                progressTitle.style.display = 'none';
+            }
+            
+            // 显示结果区域，日志区域保持显示
             document.getElementById('generation-result').style.display = 'block';
+            document.getElementById('live-logs').style.display = 'block';
             document.getElementById('result-message').textContent = progress.message || 'API测试用例生成完成';
             document.getElementById('download-link').href = `/download_file/?file_path=${encodeURIComponent(progress.file_path)}`;
+        }
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function formatLogEntry(logEntry) {
+        const escaped = escapeHtml(logEntry);
+        
+        // 根据日志级别添加颜色
+        if (escaped.includes(' - ERROR - ')) {
+            return `<span style="color: #ff6b6b;">${escaped}</span>`; // 红色 - 错误
+        } else if (escaped.includes(' - WARNING - ')) {
+            return `<span style="color: #ffa726;">${escaped}</span>`; // 橙色 - 警告
+        } else {
+            return `<span style="color: #ffffff;">${escaped}</span>`; // 白色 - 其他所有级别
         }
     }
 

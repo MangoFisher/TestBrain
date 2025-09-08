@@ -9,10 +9,12 @@ from .prompts import APITestCaseGeneratorPrompt
 from ..llm.base import LLMServiceFactory
 from .parsers.api_test_case_parser import parse_minimal_cases_or_raise
 from .parsers.retry_utils import generate_with_retry
+from utils.logger_manager import set_task_context, clear_task_context
 
 from .progress_registry import set_progress
+from utils.logger_manager import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger('apps.agents.api_case_generator')
 
 class APITestCaseGeneratorAgent:
     """API测试用例生成Agent"""
@@ -329,11 +331,16 @@ class APITestCaseGeneratorAgent:
         try:
             if not task_id:
                 task_id = f"task_{int(time.time()*1000)}"
-            # step 1
+            
+            # 设置任务上下文，确保日志镜像功能正常工作
+            set_task_context(task_id)
+            
+            # step 1 - 初始化进度数据，包括空的日志列表
             set_progress(task_id, {
                 'step': 1,
                 'message': '解析API定义文件',
-                'percentage': 10
+                'percentage': 10,
+                'logs': []  # 初始化日志列表
             })
             # 建立 path -> api_def 的索引，便于快速定位
             path_to_api: Dict[str, Dict[str, Any]] = {}
@@ -378,7 +385,7 @@ class APITestCaseGeneratorAgent:
                 future_to_path = {}
                 for api_path in valid_paths:
                     api_def = path_to_api[api_path]
-                    fut = executor.submit(self._generate_cases_for_single_api, api_def, priority, count_per_api)
+                    fut = executor.submit(self._generate_cases_for_single_api, api_def, priority, count_per_api, task_id)
                     future_to_path[fut] = (api_path, api_def.get('name', ''))
 
                 completed = 0
@@ -433,21 +440,33 @@ class APITestCaseGeneratorAgent:
                 'success': False,
                 'error': str(e)
             }
+        finally:
+            # 清除任务上下文
+            clear_task_context()
 
-    def _generate_cases_for_single_api(self, api_def: Dict[str, Any], priority: str, count_per_api: int) -> List[Dict[str, Any]]:
-        """为单个接口一次性生成多条测试用例（按接口并发，单次LLM调用）"""
-        api_name = api_def.get('name', '')
+
+    def _generate_cases_for_single_api(self, api_def: Dict[str, Any], priority: str, count_per_api: int, task_id: str = None) -> List[Dict[str, Any]]:
+        """为单个接口一次性生成多条测试用例（按接口并发，单次LLM调用）"""        
+        # 设置任务上下文（如果提供了task_id）
+        if task_id:
+            set_task_context(task_id)
+        
         try:
+            api_name = api_def.get('name', '')
             # 保护性判断：无参数则不调用模型
             if not self._has_request_parameters(api_def):
-                logger.info("接口 query、rest、body 均无请求参数，跳过 LLM 生成用例：%s", api_name)
+                logger.warning("接口 query、rest、body 均无请求参数，跳过 LLM 生成用例：%s", api_name)
                 return []
             cases = self._generate_multiple_test_cases(api_def, priority, count_per_api) or []
             logger.info("接口生成完成: %s - 新增用例 %d 条", api_name, len(cases))
             return cases
         except Exception as e:
-            logger.error("接口多用例生成异常: %s: %s", api_name, e)
+            logger.error("接口多用例生成异常: %s: %s", api_def.get('name', ''), e)
             return []
+        finally:
+            # 清除任务上下文（如果之前设置了）
+            if task_id:
+                clear_task_context()
 
     def _generate_fixed_assertion(self, condition: str) -> Dict[str, Any]:
         """后端固定生成断言结构，只让 LLM 决定 condition"""

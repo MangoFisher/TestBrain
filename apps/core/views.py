@@ -18,7 +18,7 @@ from django.conf import settings
 from apps.llm import LLMServiceFactory
 from ..knowledge.vector_store import MilvusVectorStore
 from ..knowledge.embedding import BGEM3Embedder
-from utils.logger_manager import get_logger
+from utils.logger_manager import get_logger, set_task_context, clear_task_context
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -935,11 +935,14 @@ def api_case_generate(request):
             import threading
             def _bg_job():
                 try:
+                    set_task_context(task_id)
                     generate_test_cases_for_apis(
                         file_path, selected_apis, count_per_api, priority, llm_provider, task_id
                     )
                 except Exception as e:
                     logger.error(f"后台生成失败: {e}")
+                finally:
+                    clear_task_context()
             t = threading.Thread(target=_bg_job, name=f"gen-{task_id}")
             t.daemon = True
             t.start()
@@ -970,7 +973,11 @@ def get_generation_progress_api(request):
         progress = get_task_progress(task_id)
         if not progress:
             return JsonResponse({'success': False, 'message': '未找到进度信息'})
-        return JsonResponse({'success': True, 'progress': progress})
+        
+        
+        # 将 ProgressData 对象转换为字典以便 JSON 序列化
+        progress_dict = progress.dict() if hasattr(progress, 'dict') else progress
+        return JsonResponse({'success': True, 'progress': progress_dict})
     except Exception as e:
         logger.error(f"获取进度失败: {e}")
         return JsonResponse({'success': False, 'message': str(e)})
