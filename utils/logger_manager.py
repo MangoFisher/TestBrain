@@ -1,9 +1,67 @@
 import os
 import logging
 import logging.handlers
-from datetime import datetime
+import threading
 from pathlib import Path
 from django.conf import settings
+from contextvars import ContextVar
+from typing import Dict
+from apps.agents.progress_registry import set_progress
+
+# ========= 任务上下文与镜像到进度（上移，供下方 LogManager 使用） ========
+
+# 任务ID上下文（每个任务入口设置一次）
+task_id_var: ContextVar[str | None] = ContextVar('task_id', default=None)
+
+# 全局任务ID字典，用于跨线程访问
+_task_id_registry: Dict[int, str] = {}
+_task_id_lock = threading.Lock()
+
+def set_task_context(task_id: str | None):
+    """设置当前执行上下文的 task_id（进入任务时调用）。"""
+    task_id_var.set(task_id)
+    # 同时设置到全局注册表中
+    if task_id:
+        with _task_id_lock:
+            _task_id_registry[threading.get_ident()] = task_id
+
+def clear_task_context():
+    """清除 task_id（任务结束时调用）。"""
+    task_id_var.set(None)
+    # 同时从全局注册表中清除
+    with _task_id_lock:
+        _task_id_registry.pop(threading.get_ident(), None)
+
+
+class TaskContextFilter(logging.Filter):
+    """将 task_id 注入到 LogRecord.task_id"""
+    def filter(self, record: logging.LogRecord) -> bool:
+        # 首先尝试从 ContextVar 获取
+        task_id = task_id_var.get()
+        # 如果 ContextVar 中没有，尝试从全局注册表获取
+        if task_id is None:
+            with _task_id_lock:
+                task_id = _task_id_registry.get(threading.get_ident())
+        if task_id is not None:
+            setattr(record, 'task_id', task_id)
+        return True
+
+
+class ProgressMirrorHandler(logging.Handler):
+    """把带有 task_id 的日志镜像到进度注册表的 logs 中"""
+    def emit(self, record: logging.LogRecord) -> None:
+        task_id = getattr(record, 'task_id', None)
+        if not task_id:
+            return
+        try:
+            msg = self.format(record)
+        except Exception:
+            msg = record.getMessage()
+        try:
+            set_progress(task_id, {'log': msg})
+        except Exception:
+            # 不影响主日志
+            pass
 
 # 日志级别映射
 LOG_LEVELS = {
@@ -98,6 +156,14 @@ class LogManager:
         error_handler.setLevel(logging.ERROR)
         error_handler.setFormatter(file_formatter)
         root_logger.addHandler(error_handler)
+
+        # 注入任务上下文过滤器与镜像处理器
+        task_filter = TaskContextFilter()
+        root_logger.addFilter(task_filter)
+        mirror_handler = ProgressMirrorHandler(level=self.log_level)
+        # 简洁格式，避免过长
+        mirror_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        root_logger.addHandler(mirror_handler)
     
     def _get_logger(self, name):
         """获取指定名称的日志记录器"""
@@ -121,6 +187,14 @@ class LogManager:
             logger.removeHandler(h)
             
         logger.addHandler(handler)
+        
+        # 添加任务上下文过滤器
+        task_filter = TaskContextFilter()
+        logger.addFilter(task_filter)
+        
+        # 为处理器也添加过滤器
+        handler.addFilter(task_filter)
+        
         return logger
     
     def get_logger(self, name):
@@ -133,8 +207,8 @@ class LogManager:
             if name.startswith(f"{module}."):
                 return logging.getLogger(name)
         
-        # 如果不是预定义的模块，返回根据名称创建的日志记录器
-        return logging.getLogger(name)
+        # 如果不是预定义的模块，通过_get_logger创建带有TaskContextFilter的日志记录器
+        return self._get_logger(name)
 
 # 创建单例实例
 log_manager = LogManager()
@@ -142,3 +216,4 @@ log_manager = LogManager()
 def get_logger(name):
     """获取日志记录器的便捷函数"""
     return log_manager.get_logger(name)
+
