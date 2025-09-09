@@ -5,8 +5,9 @@ import threading
 from pathlib import Path
 from django.conf import settings
 from contextvars import ContextVar
-from typing import Dict
+from typing import Dict, List
 from apps.agents.progress_registry import set_progress
+from apps.agents.sse_bus import publish_log
 
 # ========= 任务上下文与镜像到进度（上移，供下方 LogManager 使用） ========
 
@@ -34,7 +35,7 @@ def clear_task_context():
 
 
 class TaskContextFilter(logging.Filter):
-    """将 task_id 注入到 LogRecord.task_id"""
+    """将 task_id 注入到 LogRecord.task_id；支持多任务与任务类型信息"""
     def filter(self, record: logging.LogRecord) -> bool:
         # 首先尝试从 ContextVar 获取
         task_id = task_id_var.get()
@@ -44,24 +45,47 @@ class TaskContextFilter(logging.Filter):
                 task_id = _task_id_registry.get(threading.get_ident())
         if task_id is not None:
             setattr(record, 'task_id', task_id)
+        # 允许业务在 record 上附加多个任务ID或任务类型（可选）
+        if not hasattr(record, 'task_ids'):
+            setattr(record, 'task_ids', None)
+        if not hasattr(record, 'task_type'):
+            setattr(record, 'task_type', None)
         return True
 
 
 class ProgressMirrorHandler(logging.Handler):
-    """把带有 task_id 的日志镜像到进度注册表的 logs 中"""
+    """把带有 task_id/ids 的日志镜像到进度注册表和 SSE 队列中，支持多任务、多类型"""
     def emit(self, record: logging.LogRecord) -> None:
-        task_id = getattr(record, 'task_id', None)
-        if not task_id:
-            return
+        # 支持多个任务ID；若不存在则使用单个 task_id
+        task_ids = getattr(record, 'task_ids', None)
+        if not task_ids:
+            single_id = getattr(record, 'task_id', None)
+            if not single_id:
+                return
+            task_ids = [single_id]
         try:
             msg = self.format(record)
         except Exception:
             msg = record.getMessage()
-        try:
-            set_progress(task_id, {'log': msg})
-        except Exception:
-            # 不影响主日志
-            pass
+        # 任务类型（可选）
+        task_type = getattr(record, 'task_type', None) or 'generation'
+        for tid in task_ids:
+            try:
+                set_progress(tid, {'log': msg})
+            except Exception:
+                pass
+            try:
+                publish_log(
+                    task_id=tid,
+                    level=record.levelname,
+                    msg=msg,
+                    name=record.name,
+                    thread=f"{record.thread} {record.threadName}",
+                    task_type=task_type,
+                    module=record.name,
+                )
+            except Exception:
+                pass
 
 # 日志级别映射
 LOG_LEVELS = {

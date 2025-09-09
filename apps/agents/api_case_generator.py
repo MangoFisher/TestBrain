@@ -8,13 +8,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .prompts import APITestCaseGeneratorPrompt
 from ..llm.base import LLMServiceFactory
 from .parsers.api_test_case_parser import parse_minimal_cases_or_raise
-from .parsers.retry_utils import generate_with_retry
+from .retry_utils import generate_with_retry
 from utils.logger_manager import set_task_context, clear_task_context
 
 from .progress_registry import set_progress
+from .schemas.progress_schema import TaskStatus
 from utils.logger_manager import get_logger
 
-logger = get_logger('apps.agents.api_case_generator')
+# 为本模块的日志统一附加 task_type，用于前端区分“生成类”任务
+_base_logger = get_logger('apps.agents.api_case_generator')
+logger = logging.LoggerAdapter(_base_logger, {'task_type': 'generation'})
 
 class APITestCaseGeneratorAgent:
     """API测试用例生成Agent"""
@@ -425,7 +428,7 @@ class APITestCaseGeneratorAgent:
                 total_cases += len(cases)
 
             # step 5: 最终 100% 由外层写回文件后统一写入，避免多源
-            logger.info(f"合并完成，共为 {len(results_by_path)} 个接口合并了 {total_cases} 条测试用例")
+            logger.info(f"合并完成，本次调用结束，共为 {len(results_by_path)} 个接口合并了 {total_cases} 条测试用例")
             return {
                 'success': True,
                 'message': f'成功为{len(valid_paths)}个接口新增生成了测试用例，共 {total_cases} 条',
@@ -543,22 +546,44 @@ def generate_test_cases_for_apis(file_path: str, selected_apis: list, count_per_
         result = agent.generate_test_cases_for_apis_batch(
             data['apiDefinitions'], selected_apis, count_per_api, priority, task_id
         )
+        # 调试：打印批量生成返回结果，便于定位进度未到 100% 的原因
+        try:
+            logger.info("批量生成返回: %s", result)
+        except Exception:
+            pass
         
         if result['success']:
-            # 写回文件
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+            # 写回文件（观测日志：写回前）
+            logger.info("开始写回文件: %s", file_path)
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                logger.info("写回成功，准备设置100%%进度与下载路径")
+            except Exception as e:
+                logger.error("写回文件失败: %s", e)
+                if task_id:
+                    try:
+                        set_progress(task_id, {
+                            'step': -1,
+                            'message': f'写回文件失败: {e}',
+                            'status': TaskStatus.FAILED
+                        })
+                    except Exception:
+                        pass
+                return result
             # 在进度中补充最终下载路径
             if task_id:
                 try:
                     set_progress(task_id, {
                         'step': 5,
-                        'message': result.get('message', '生成完成'),
+                        'message': f'{result.get("message", "生成完成")}，文件已保存',
                         'percentage': 100,
-                        'file_path': file_path
+                        'file_path': file_path,
+                        'status': TaskStatus.COMPLETED
                     })
-                except Exception:
-                    pass
+                    logger.info("已设置100%%进度与下载路径")
+                except Exception as e:
+                    logger.error("设置100%%进度失败: %s", e)
         
         return result
         
