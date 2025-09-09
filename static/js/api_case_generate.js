@@ -325,9 +325,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 开始轮询进度
                 if (result.task_id) {
                     window.currentTaskId = result.task_id;
-                    // 立即拉一次，再定时
-                    await pollProgress(result.task_id);
-                    window.progressTimer = setInterval(() => pollProgress(result.task_id), 2000);
+                    // 优先尝试 SSE，失败回退轮询
+                    startSSE(result.task_id);
                 }
             } else {
                 alert('生成失败: ' + result.error);
@@ -363,6 +362,56 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // SSE 优先，失败回退轮询
+    function startSSE(taskId) {
+        try {
+            // 清理旧连接
+            if (window.es) {
+                try { window.es.close(); } catch (_) {}
+                window.es = null;
+            }
+
+            // 先立即拉一次，避免等待首条日志事件
+            pollProgress(taskId);
+
+            const url = `/api/stream-logs/?task_id=${encodeURIComponent(taskId)}`;
+            const es = new EventSource(url);
+            window.es = es;
+
+            es.onopen = () => {
+                // 连接建立后再拉一次，确保状态最新
+                pollProgress(taskId);
+            };
+            // 收到日志事件后拉一次最新进度
+            es.addEventListener('log', () => {
+                pollProgress(taskId);
+            });
+            // 后端 progress 事件：定期驱动刷新
+            es.addEventListener('progress', () => {
+                pollProgress(taskId);
+            });
+            es.onerror = () => {
+                // 连接异常，回退到轮询
+                try { es.close(); } catch (_) {}
+                window.es = null;
+                // 启动轮询作为兜底
+                if (!window.progressTimer) {
+                    window.progressTimer = setInterval(() => pollProgress(taskId), 2000);
+                }
+            };
+            // 无论连接是否稳定，都启动轻量兜底轮询（完成时自动清理）
+            if (!window.progressTimer) {
+                window.progressTimer = setInterval(() => pollProgress(taskId), 2000);
+            }
+        } catch (_) {
+            // 直接回退轮询
+            pollProgress(taskId);
+            if (!window.progressTimer) {
+                window.progressTimer = setInterval(() => pollProgress(taskId), 2000);
+            }
+        }
+    }
+
     function updateProgressUI(progress) {
         const bar = document.getElementById('progress-bar');
         const text = document.getElementById('progress-text');
@@ -382,8 +431,8 @@ document.addEventListener('DOMContentLoaded', function() {
             logsBox.innerHTML = progress.logs.map(l => `<div>${formatLogEntry(l)}</div>`).join('');
             logsBox.scrollTop = logsBox.scrollHeight;
         }
-        // 完成后自动显示结果（如果后端已返回下载路径则按钮会可用）
-        if (progress.percentage >= 100 && progress.file_path) {
+        // 完成后自动显示结果（若无文件路径也先展示完成状态，链接在可用时再赋值）
+        if (progress.percentage >= 100) {
             // 隐藏进度条相关元素
             document.getElementById('progress-bar').style.display = 'none';
             document.getElementById('progress-text').style.display = 'none';
@@ -395,11 +444,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 progressTitle.style.display = 'none';
             }
             
-            // 显示结果区域，日志区域保持显示
+            // 切换到结果区域，隐藏整个进度容器，日志区域保持显示
+            const progressContainer = document.getElementById('generation-progress');
+            if (progressContainer) progressContainer.style.display = 'none';
             document.getElementById('generation-result').style.display = 'block';
             document.getElementById('live-logs').style.display = 'block';
             document.getElementById('result-message').textContent = progress.message || 'API测试用例生成完成';
-            document.getElementById('download-link').href = `/download_file/?file_path=${encodeURIComponent(progress.file_path)}`;
+            if (progress.file_path) {
+                document.getElementById('download-link').href = `/download_file/?file_path=${encodeURIComponent(progress.file_path)}`;
+                document.getElementById('download-link').classList.remove('disabled');
+            }
+            // 完成后清理 SSE 与轮询
+            if (window.es) {
+                try { window.es.close(); } catch (_) {}
+                window.es = null;
+            }
+            if (window.progressTimer) {
+                clearInterval(window.progressTimer);
+                window.progressTimer = null;
+            }
         }
     }
 

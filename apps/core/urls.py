@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views_sse import stream_logs
 
 urlpatterns = [
     # 页面路由
@@ -33,4 +34,5 @@ urlpatterns = [
     path('api/search-knowledge/', views.search_knowledge, name='search_knowledge'),   
     path('api/delete-test-cases/', views.delete_test_cases, name='delete_test_cases'), #删除选中的测试用例
     path('api/get-generation-progress/', views.get_generation_progress_api, name='get_generation_progress'), #获取生成进度
+    path('api/stream-logs/', stream_logs, name='stream_logs'),
 ] 

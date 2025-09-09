@@ -1,7 +1,30 @@
+"""
+任务进度注册表
+
+提供线程安全的任务进度数据存储和管理功能，支持多任务并发执行时的进度跟踪。
+
+主要功能：
+- 存储和更新任务进度数据（步骤、百分比、消息等）
+- 收集和追加任务执行日志
+- 提供进度数据查询和清理接口
+- 支持任务过期清理机制
+
+核心特性：
+- 线程安全：使用锁保护共享数据
+- 类型安全：基于 Pydantic 模型进行数据验证
+- 日志管理：自动限制日志数量，防止内存溢出
+- 时间戳：自动记录最后更新时间
+
+使用场景：
+- 测试用例生成任务的进度跟踪
+- 长时间运行任务的状态监控
+- 前端实时进度显示的数据源
+"""
+
 import threading
 import time
 from typing import Dict, Optional
-from .schemas.progress_schema import ProgressData, ProgressUpdate
+from .schemas.progress_schema import ProgressData, ProgressUpdate, TaskStatus
 
 _progress_registry: Dict[str, ProgressData] = {}
 _lock = threading.Lock()
@@ -43,6 +66,13 @@ def set_progress(task_id: str, data: dict) -> None:
         for key, value in update_dict.items():
             if hasattr(current, key):
                 setattr(current, key, value)
+        
+        # 自动更新任务状态
+        if current.percentage is not None:
+            if current.percentage >= 100:
+                current.status = TaskStatus.COMPLETED
+            elif current.percentage > 0:
+                current.status = TaskStatus.RUNNING
         
         # 更新时间戳
         current.timestamp = time.time()
