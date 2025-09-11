@@ -28,6 +28,8 @@ class APITestCaseGeneratorAgent:
         self.prompt = APITestCaseGeneratorPrompt()
         self.test_case_full_template = self._load_test_case_full_template()
         self.max_workers = 5
+        # 可选：用户覆盖的“测试用例生成规则”
+        self.rule_override: Optional[str] = None
     
     def _has_request_parameters(self, api_info: Dict[str, Any]) -> bool:
         """判断接口是否包含任何请求参数（query/rest/body(JSON)）。
@@ -148,7 +150,8 @@ class APITestCaseGeneratorAgent:
             priority=priority,
             case_count=count,
             api_test_case_min_template=json.dumps(minimal_template, ensure_ascii=False, indent=2),
-            include_format_instructions=include_format_instructions
+            include_format_instructions=include_format_instructions,
+            case_rule_override=self.rule_override
         )
 
     def _generate_with_retry(self, api_info: Dict[str, Any], priority: str, count: int) -> Optional[List]:
@@ -532,7 +535,27 @@ def parse_api_definitions(file_path: str) -> List[Dict]:
 
 
 def generate_test_cases_for_apis(file_path: str, selected_apis: list, count_per_api: int, 
-                                 priority: str, llm_provider: str, task_id: Optional[str] = None) -> Dict:
+                                 priority: str, llm_provider: str, task_id: Optional[str] = None,
+                                 rules_override: Optional[str] = None) -> Dict:
+    """为选中的API接口批量生成测试用例
+    
+    Args:
+        file_path: API定义文件路径（JSON格式，来自Metersphere导出）
+        selected_apis: 选中的API接口列表，每个元素包含接口的路径和名称信息
+        count_per_api: 每个接口生成的测试用例数量（1-10条）
+        priority: 测试用例优先级（P0-P4）
+        llm_provider: 大模型提供商（如'deepseek', 'qwen'等）
+        task_id: 任务ID，用于进度跟踪和日志关联（可选）
+        rules_override: 自定义测试用例生成规则（Markdown格式），用于覆盖模板中的默认规则（可选）
+        
+    Returns:
+        Dict: 包含生成结果的字典
+            - success: bool, 是否成功
+            - message: str, 结果消息
+            - generated_cases: int, 生成的测试用例总数
+            - selected_api_count: int, 处理的接口数量
+            - task_id: str, 任务ID
+    """
     """为选中的API生成测试用例"""
     try:
         # 读取原文件
@@ -541,6 +564,13 @@ def generate_test_cases_for_apis(file_path: str, selected_apis: list, count_per_
         
         # 创建Agent
         agent = APITestCaseGeneratorAgent(llm_provider)
+        # 注入自定义规则（若有）
+        if rules_override:
+            try:
+                agent.rule_override = rules_override
+                logger.info("使用自定义规则覆盖: 长度=%d", len(rules_override))
+            except Exception:
+                pass
         
         # 批量生成测试用例
         result = agent.generate_test_cases_for_apis_batch(

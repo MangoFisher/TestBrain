@@ -93,17 +93,32 @@
 <!-- 接口选择界面 -->
 <div id="api-selection" style="display: none;">
     <h3>选择要生成测试用例的接口</h3>
+    <!-- 测试用例生成规则（Markdown 编辑 + 预览） -->
+    <div class="mt-3" id="rule-editor-section">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-2">测试用例生成规则<span style="color: red; font-style: italic;">(如果你了解提示词工程, 可以自定义规则, 满足你的个性化需求)</span></h5>
+            <small id="rule-char-count" class="text-muted">0/1000</small>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <textarea id="rule-editor" class="form-control" rows="10" style="height: 200px;" placeholder="在此编辑规则（Markdown）" maxlength="1000"></textarea>
+                <div class="mt-2">
+                    <small id="rule-validate-msg" class="text-muted"></small>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <div class="form-group">
-        <div class="table-responsive">
-            <table class="table table-striped table-hover" style="margin-bottom: 0; border: 1px solid #dee2e6;">
-                <thead>
+        <div style="max-height: 500px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px;">
+            <table style="width: 100%; border-collapse: collapse; margin: 0;">
+                <thead style="position: sticky; top: 0; z-index: 10; background-color: #007bff;">
                     <tr>
-                        <th width="80" class="text-center" style="background-color: #007bff; color: white; border-bottom: 2px solid #0056b3; vertical-align: middle;">
-                            <input type="checkbox" id="select-all" class="form-check-input" style="margin: 0; transform: scale(1.2);">
+                        <th style="width: 80px; background-color: #007bff; color: white; border: 1px solid #0056b3; text-align: center; padding: 8px;">
+                            <input type="checkbox" id="select-all" style="margin: 0; transform: scale(1.2);">
                         </th>
-                        <th width="40%" style="background-color: #007bff; color: white; border-bottom: 2px solid #0056b3;">API路径</th>
-                        <th style="background-color: #007bff; color: white; border-bottom: 2px solid #0056b3;">API名称</th>
+                        <th style="width: 40%; background-color: #007bff; color: white; border: 1px solid #0056b3; padding: 8px;">API路径</th>
+                        <th style="background-color: #007bff; color: white; border: 1px solid #0056b3; padding: 8px;">API名称</th>
                     </tr>
                 </thead>
                 <tbody id="api-table-body">
@@ -115,7 +130,7 @@
     
     <div class="form-group">
         <label for="count-per-api">每个接口生成测试用例数量：</label>
-        <input type="number" id="count-per-api" class="form-control" value="1" min="1" max="10">
+        <input type="number" id="count-per-api" class="form-control" value="1" min="1" max="100">
     </div>
     
     <div class="form-group">
@@ -145,7 +160,7 @@
 
 <!-- 生成进度界面 -->
 <div id="generation-progress" style="display: none;">
-    <h3>正在生成测试用例...</h3>
+    <h3>正在生成API测试用例...</h3>
     <div class="progress">
         <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
     </div>

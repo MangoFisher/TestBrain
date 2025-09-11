@@ -10,6 +10,7 @@ from ..agents.generator import TestCaseGeneratorAgent
 from ..agents.reviewer import TestCaseReviewerAgent
 from ..agents.analyser import PrdAnalyserAgent
 from ..agents.api_case_generator import APITestCaseGeneratorAgent, parse_api_definitions, generate_test_cases_for_apis
+from ..agents.prompts import APITestCaseGeneratorPrompt
 from ..agents.progress_registry import get_progress as get_task_progress
 from ..knowledge.service import KnowledgeService
 
@@ -936,8 +937,11 @@ def api_case_generate(request):
             def _bg_job():
                 try:
                     set_task_context(task_id)
+                    # 透传用户规则覆盖（若有）
+                    rules_override = request.POST.get('rules_override') or None
                     generate_test_cases_for_apis(
-                        file_path, selected_apis, count_per_api, priority, llm_provider, task_id
+                        file_path, selected_apis, count_per_api, priority, llm_provider, task_id,
+                        rules_override=rules_override
                     )
                 except Exception as e:
                     logger.error(f"后台生成失败: {e}")
@@ -980,6 +984,30 @@ def get_generation_progress_api(request):
         return JsonResponse({'success': True, 'progress': progress_dict})
     except Exception as e:
         logger.error(f"获取进度失败: {e}")
+        return JsonResponse({'success': False, 'message': str(e)})
+
+
+def get_testcase_rule_template(request):
+    """返回模版中的“测试用例生成规则”文本（只读）"""
+    try:
+        # 直接读取 prompts_config.yaml 中 api_test_case_generator.human_template 的规则段
+        # 为简单起见，这里复用 PromptTemplateManager 已加载的配置
+        from ..agents.prompts import PromptTemplateManager
+        mgr = PromptTemplateManager()
+        cfg = mgr.config.get('api_test_case_generator') or {}
+        # 规则一般位于 human_template 中“## 测试用例生成规则”标题之后
+        human_tpl = cfg.get('human_template') or ''
+        rule_text = ''
+        if human_tpl:
+            marker = '## 测试用例生成规则'
+            idx = human_tpl.find(marker)
+            if idx >= 0:
+                rule_text = human_tpl[idx:]
+            else:
+                rule_text = human_tpl
+        return JsonResponse({'success': True, 'rule_text': rule_text})
+    except Exception as e:
+        logger.error(f"读取规则模版失败: {e}")
         return JsonResponse({'success': False, 'message': str(e)})
     
     
