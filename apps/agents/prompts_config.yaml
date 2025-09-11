@@ -220,10 +220,10 @@ api_test_case_generator:
 
     ## 测试用例生成规则
     1. 根据参数信息生成不同类型的测试用例:
-       - 合法参数: 使用样例值, expectedValue="10000"
-       - 缺失必填: 移除必填参数, expectedValue≠"10000"
-       - 类型错误: 改变参数类型, expectedValue≠"10000"
-       - 值不合法: 根据参数类型生成非法值, expectedValue≠"10000"
+       - 合法参数: 使用样例值, expectedValue = "10000"
+       - 缺失必填: 移除必填参数, expectedValue != "10000"
+       - 类型错误: 改变参数类型, expectedValue != "10000"
+       - 值不合法: 根据参数类型生成非法值, expectedValue != "10000"
        - 边界值: 使用最小/最大值, 按合法性判定expectedValue
     2. 只生成RESPONSE_BODY类型的断言, expression固定为"code", condition字段只能取EQUALS(表示相等)、NOT_EQUALS(表示不相等)
     3. 参数变换规则:
@@ -231,4 +231,5 @@ api_test_case_generator:
        - 字符串: 单个字符的字符串、超长字符串(200个字符以内)、样本字符串替换中间部分的其中一个字符为特殊字符
        - 布尔型: 取反值
        - 数组: 空数组、null值
+       - 参数值永远不能为空
        - 在生成参数值时, 绝对不要使用任何公式和表达式如"a".repeat(256) 

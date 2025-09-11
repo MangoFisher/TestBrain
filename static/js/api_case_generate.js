@@ -167,6 +167,113 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 保存文件路径
             window.uploadedFilePath = response.file_path;
+
+            // 初始化规则编辑区：从后端拉取模版规则
+            fetch('/api/testcase-rule-template/')
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.success) {
+                        window.defaultRuleText = data.rule_text || '';
+                        const editor = document.getElementById('rule-editor');
+                        if (editor) {
+                            editor.value = window.defaultRuleText;
+                            updateCharCount();
+                            setupRuleEditorValidation();
+                        }
+                    }
+                })
+                .catch(() => {});
+        }
+    }
+
+    // 更新字符计数显示
+    function updateCharCount() {
+        const editor = document.getElementById('rule-editor');
+        const charCount = document.getElementById('rule-char-count');
+        if (editor && charCount) {
+            const currentLength = editor.value.length;
+            charCount.textContent = `${currentLength}/1000`;
+            
+            // 根据字符数量改变颜色
+            if (currentLength > 1000) {
+                charCount.style.color = '#dc3545'; // 红色
+            } else if (currentLength > 800) {
+                charCount.style.color = '#ffc107'; // 黄色
+            } else {
+                charCount.style.color = '#6c757d'; // 灰色
+            }
+        }
+    }
+
+    // 设置规则编辑器验证
+    function setupRuleEditorValidation() {
+        const editor = document.getElementById('rule-editor');
+        if (!editor) return;
+
+        // 字符类型验证：只允许中英文字符和标点符号
+        editor.addEventListener('input', function(e) {
+            const value = e.target.value;
+            // 允许中英文字符、数字、空格、换行、制表符，以及中英文标点符号
+            const validValue = value.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\s\n\r\t\u3000-\u303f\uff00-\uffef\u2000-\u206f\u0020-\u002f\u003a-\u0040\u005b-\u0060\u007b-\u007e]/g, '');
+            
+            if (value !== validValue) {
+                e.target.value = validValue;
+                showValidationMessage('只允许输入中英文、数字和标点符号', 'error');
+            } else {
+                clearValidationMessage();
+            }
+            
+            updateCharCount();
+        });
+
+        // 字符长度限制
+        editor.addEventListener('input', function(e) {
+            const value = e.target.value;
+            if (value.length > 1000) {
+                e.target.value = value.substring(0, 1000);
+                showValidationMessage('字符数量不能超过1000个', 'error');
+            } else {
+                clearValidationMessage();
+            }
+            updateCharCount();
+        });
+
+        // 粘贴事件处理
+        editor.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                const value = e.target.value;
+                const validValue = value.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\s\n\r\t\u3000-\u303f\uff00-\uffef\u2000-\u206f\u0020-\u002f\u003a-\u0040\u005b-\u0060\u007b-\u007e]/g, '');
+                
+                if (value !== validValue) {
+                    e.target.value = validValue;
+                    showValidationMessage('粘贴内容包含非法字符（仅允许中英文、数字和标点），已自动过滤', 'warning');
+                }
+                
+                if (value.length > 1000) {
+                    e.target.value = value.substring(0, 1000);
+                    showValidationMessage('粘贴内容超过1000字符限制，已截断', 'warning');
+                }
+                
+                updateCharCount();
+            }, 0);
+        });
+    }
+
+    // 显示验证消息
+    function showValidationMessage(message, type) {
+        const msgEl = document.getElementById('rule-validate-msg');
+        if (msgEl) {
+            msgEl.textContent = message;
+            msgEl.style.color = type === 'error' ? '#dc3545' : '#ffc107';
+        }
+    }
+
+    // 清除验证消息
+    function clearValidationMessage() {
+        const msgEl = document.getElementById('rule-validate-msg');
+        if (msgEl) {
+            msgEl.textContent = '';
+            msgEl.style.color = '#6c757d';
         }
     }
 
@@ -185,12 +292,14 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 第一列：勾选框
             const checkboxCell = document.createElement('td');
-            checkboxCell.className = 'text-center';
-            checkboxCell.style.verticalAlign = 'middle';
+            checkboxCell.style.width = '80px';
+            checkboxCell.style.textAlign = 'center';
+            checkboxCell.style.padding = '8px';
+            checkboxCell.style.border = '1px solid #dee2e6';
             
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
-            checkbox.className = 'form-check-input api-checkbox';
+            checkbox.className = 'api-checkbox';
             checkbox.value = api.path;
             checkbox.id = `api-${api.path.replace(/[^a-zA-Z0-9]/g, '-')}`;
             checkbox.style.margin = '0';
@@ -200,10 +309,15 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 第二列：API路径
             const pathCell = document.createElement('td');
+            pathCell.style.width = '40%';
+            pathCell.style.padding = '8px';
+            pathCell.style.border = '1px solid #dee2e6';
             pathCell.innerHTML = `<code>${api.method} ${api.path}</code>`;
             
             // 第三列：API名称
             const nameCell = document.createElement('td');
+            nameCell.style.padding = '8px';
+            nameCell.style.border = '1px solid #dee2e6';
             let nameContent = api.name;
             if (api.has_test_cases) {
                 let cnt = null;
@@ -236,7 +350,20 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        const countPerApi = document.getElementById('count-per-api').value;
+        const countInput = document.getElementById('count-per-api');
+        let countPerApi = parseInt(countInput.value || '0', 10);
+        if (isNaN(countPerApi) || countPerApi <= 0) {
+            alert('每个接口生成数量必须为正整数');
+            countInput.focus();
+            return;
+        }
+        
+        const totalCount = selectedApis.length * countPerApi;
+        if (totalCount < 1 || totalCount > 100) {
+            alert(`单次生成测试用例数量不能超过100条`);
+            return;
+        }
+        
         const priority = document.getElementById('priority').value;
         const llmProvider = document.getElementById('llm-provider').value;
         
@@ -248,6 +375,34 @@ document.addEventListener('DOMContentLoaded', function() {
         // 发送生成请求
         generateTestCases(selectedApis, countPerApi, priority, llmProvider);
     });
+
+    // 对“每个接口生成测试用例数量”的输入框仅允许数字
+    (function enforceDigitOnlyForCountInput() {
+        const countInput = document.getElementById('count-per-api');
+        if (!countInput) return;
+
+        // 提示移动端弹出数字键盘
+        try {
+            countInput.setAttribute('inputmode', 'numeric');
+            countInput.setAttribute('pattern', '\\d*');
+        } catch (_) {}
+
+        const sanitize = () => {
+            const digits = (countInput.value || '').replace(/\D+/g, '');
+            countInput.value = digits;
+        };
+
+        countInput.addEventListener('input', sanitize);
+        countInput.addEventListener('paste', function() {
+            setTimeout(sanitize, 0);
+        });
+        countInput.addEventListener('blur', function() {
+            sanitize();
+            if (countInput.value === '' || countInput.value === '0') {
+                countInput.value = '1';
+            }
+        });
+    })();
 
     // 绑定全选功能
     function bindSelectAllFunctionality() {
@@ -310,6 +465,40 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('count_per_api', countPerApi);
             formData.append('priority', priority);
             formData.append('llm_provider', llmProvider);
+            // 附带规则覆盖（若与默认不同且校验通过）
+            const editor = document.getElementById('rule-editor');
+            const msgEl = document.getElementById('rule-validate-msg');
+            let rulesOverride = '';
+            if (editor) {
+                const current = (editor.value || '').trim();
+                const defaultText = (window.defaultRuleText || '').trim();
+                if (current && current !== defaultText) {
+                    // 验证字符类型和长度
+                    const isValidChars = /^[\u4e00-\u9fa5a-zA-Z0-9\s\n\r\t\u3000-\u303f\uff00-\uffef\u2000-\u206f\u0020-\u002f\u003a-\u0040\u005b-\u0060\u007b-\u007e]*$/.test(current);
+                    const isValidLength = current.length <= 1000;
+                    
+                    if (!isValidChars) {
+                        if (msgEl) {
+                            msgEl.textContent = '规则包含非法字符，只允许中英文字符和标点符号，已忽略自定义规则。';
+                            msgEl.style.color = '#dc3545';
+                        }
+                    } else if (!isValidLength) {
+                        if (msgEl) {
+                            msgEl.textContent = '规则文本过长（>1000字符），已忽略自定义规则，继续使用模版。';
+                            msgEl.style.color = '#dc3545';
+                        }
+                    } else {
+                        rulesOverride = current;
+                        if (msgEl) {
+                            msgEl.textContent = '已使用自定义规则';
+                            msgEl.style.color = '#28a745';
+                        }
+                    }
+                }
+            }
+            if (rulesOverride) {
+                formData.append('rules_override', rulesOverride);
+            }
             
             const response = await fetch('/api_case_generate/', {
                 method: 'POST',

@@ -235,7 +235,8 @@ class APITestCaseGeneratorPrompt:
     
     def format_messages(self, api_info: Dict[str, Any], priority: str, 
                        case_count: int, api_test_case_min_template: str, 
-                       include_format_instructions: bool = False) -> list:
+                       include_format_instructions: bool = False,
+                       case_rule_override: str | None = None) -> list:
         """格式化消息
         
         Args:
@@ -244,6 +245,7 @@ class APITestCaseGeneratorPrompt:
             case_count: 生成测试用例数量
             test_case_template: 测试用例结构模板
             include_format_instructions: 是否包含格式说明（用于重试）
+            case_rule_override: 自定义测试用例生成规则（Markdown格式），用于覆盖模板中的默认规则（可选）
             
         Returns:
             格式化后的消息列表
@@ -263,6 +265,20 @@ class APITestCaseGeneratorPrompt:
             api_response_summary=response_block,
             api_test_case_min_template=api_test_case_min_template
         )
+
+        # 若提供了规则覆盖，将其追加/替换到最后的人类消息中
+        if case_rule_override:
+            override_text = str(case_rule_override)
+            marker = '## 测试用例生成规则'
+            for msg in reversed(messages):
+                if hasattr(msg, 'content'):
+                    content = msg.content
+                    idx = content.find(marker)
+                    if idx >= 0:
+                        msg.content = content[:idx] + override_text
+                    else:
+                        msg.content += f"\n\n{override_text}"
+                    break
         
         # 如果需要格式说明（重试时），追加到最后一个 HumanMessage
         if include_format_instructions:
