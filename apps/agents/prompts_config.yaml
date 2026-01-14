@@ -173,8 +173,7 @@ api_test_case_generator:
     - "接口参数类型、样例值"
     - "测试用例模版"
     - "测试用例生成规则"
-   
-  
+
   template_understanding:
     - "FIXED:字段名 - 表示从api_info中取对应字段的值,例如:FIXED:api_info.name 表示取API定义的名称"
     - "DEFAULT:值 - 表示使用指定的默认值,例如:DEFAULT:P0 表示优先级默认为P0"
@@ -197,8 +196,6 @@ api_test_case_generator:
     3. 不要在JSON数据之前或之后添加任何额外的解释文本
     4. 确保所有字符串使用双引号,不要使用单引号
     5. 严格按照提供的模板结构生成,不要遗漏任何字段
-
-    
 
   human_template: |
     请基于以下API接口定义, 生成严格符合模版结构的测试用例:
