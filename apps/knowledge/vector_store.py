@@ -1,3 +1,11 @@
+#TODO: 检索优化
+'''
+开发者可根据具体需求组合使用，例如在 RAG 系统中：
+用稀疏检索召回包含关键词的文档（如 “合同”“解除”）。
+用稠密检索对结果按语义相关性排序（如 “合同解除条款” 优先于 “合同签订流程”）。
+用多向量检索对前 50 篇文档的具体段落进行细粒度匹配（如 “单方面解除条件”）
+'''
+
 from pymilvus import connections, Collection, utility, DataType
 from pymilvus import CollectionSchema, FieldSchema
 import numpy as np
