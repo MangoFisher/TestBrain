@@ -2,7 +2,7 @@ from .vector_store import MilvusVectorStore
 from .embedding import BGEM3Embedder
 from ..core.models import KnowledgeBase
 from typing import List, Dict, Any
-from utils.logger_manager import get_logger
+from apps.utils.logger_manager import get_logger
 
 class KnowledgeService:
     """知识库服务，整合向量存储和嵌入模型"""

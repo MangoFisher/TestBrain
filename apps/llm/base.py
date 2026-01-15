@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional
 import os
 import time
 from dotenv import load_dotenv
-from utils.logger_manager import get_logger
+from apps.utils.logger_manager import get_logger
 from django.conf import settings
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage

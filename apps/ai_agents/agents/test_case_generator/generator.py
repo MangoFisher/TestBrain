@@ -1,10 +1,10 @@
 from typing import Dict, Any, List, Optional
 import json
 from langchain_core.messages import SystemMessage, HumanMessage
-from ..llm.base import BaseLLMService
-from ..knowledge.service import KnowledgeService
+from apps.llm.base import BaseLLMService
+from apps.knowledge.service import KnowledgeService
 from .prompts import TestCaseGeneratorPrompt
-from utils.logger_manager import get_logger
+from apps.utils.logger_manager import get_logger
 import re
 class TestCaseGeneratorAgent:
     """测试用例生成Agent"""

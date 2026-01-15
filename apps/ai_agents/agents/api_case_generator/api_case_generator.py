@@ -6,14 +6,14 @@ import logging
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .prompts import APITestCaseGeneratorPrompt
-from ..llm.base import LLMServiceFactory
-from .parsers.api_test_case_parser import parse_minimal_cases_or_raise
+from apps.llm.base import LLMServiceFactory
+from .api_test_case_parser import parse_minimal_cases_or_raise
 from .retry_utils import generate_with_retry
-from utils.logger_manager import set_task_context, clear_task_context
+from apps.utils.logger_manager import set_task_context, clear_task_context
 
-from .progress_registry import set_progress
-from .schemas.progress_schema import TaskStatus
-from utils.logger_manager import get_logger
+from apps.utils.progress_registry import set_progress
+from apps.utils.progress_schema import TaskStatus
+from apps.utils.logger_manager import get_logger
 
 # 为本模块的日志统一附加 task_type，用于前端区分“生成类”任务
 _base_logger = get_logger('apps.agents.api_case_generator')

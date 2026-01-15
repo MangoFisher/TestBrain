@@ -24,7 +24,7 @@
 import threading
 import time
 from typing import Dict, Optional
-from .schemas.progress_schema import ProgressData, ProgressUpdate, TaskStatus
+from .progress_schema import ProgressData, ProgressUpdate, TaskStatus
 
 _progress_registry: Dict[str, ProgressData] = {}
 _lock = threading.Lock()

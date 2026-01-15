@@ -53,7 +53,8 @@ INSTALLED_APPS = [
     # 自定义应用
     'apps.core',
     'apps.llm',
-    'apps.agents',
+    # 'apps.agents',
+    'apps.ai_agents',
     'apps.knowledge',
 ]
 

@@ -6,12 +6,12 @@ import json
 
 from .models import TestCase, TestCaseReview, KnowledgeBase
 from .forms import TestCaseForm, TestCaseReviewForm, KnowledgeBaseForm
-from ..agents.generator import TestCaseGeneratorAgent
-from ..agents.reviewer import TestCaseReviewerAgent
-from ..agents.analyser import PrdAnalyserAgent
-from ..agents.api_case_generator import APITestCaseGeneratorAgent, parse_api_definitions, generate_test_cases_for_apis
-from ..agents.prompts import APITestCaseGeneratorPrompt
-from ..agents.progress_registry import get_progress as get_task_progress
+from apps.ai_agents.agents.test_case_generator.generator import TestCaseGeneratorAgent
+from apps.ai_agents.agents.test_case_reviewer.reviewer import TestCaseReviewerAgent
+from apps.ai_agents.agents.prd_analyzer.analyser import PrdAnalyserAgent
+from apps.ai_agents.agents.api_case_generator.api_case_generator import APITestCaseGeneratorAgent, parse_api_definitions,generate_test_cases_for_apis
+from apps.ai_agents.agents.api_case_generator.prompts import APITestCaseGeneratorPrompt
+from apps.utils.progress_registry import get_progress as get_task_progress
 from ..knowledge.service import KnowledgeService
 
 # 初始化服务
@@ -19,7 +19,7 @@ from django.conf import settings
 from apps.llm import LLMServiceFactory
 from ..knowledge.vector_store import MilvusVectorStore
 from ..knowledge.embedding import BGEM3Embedder
-from utils.logger_manager import get_logger, set_task_context, clear_task_context
+from apps.utils.logger_manager import get_logger, set_task_context, clear_task_context
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -34,7 +34,7 @@ import gc
 import xlwt
 from django.http import HttpResponse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from utils.file_transfer import word_to_markdown
+from apps.utils.file_transfer import word_to_markdown
 
 logger = get_logger(__name__)
 

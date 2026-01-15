@@ -21,7 +21,7 @@ import time
 from typing import Iterator
 from django.http import StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
-from apps.agents.sse_bus import get_queue
+from ..utils.sse_bus import get_queue
 
 
 @csrf_exempt

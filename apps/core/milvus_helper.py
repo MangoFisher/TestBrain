@@ -11,7 +11,7 @@ from unstructured.partition.xlsx import partition_xlsx
 # chunking策略basic适合表格结构文件, by_title适合文档结构文件,具体可翻阅https://docs.unstructured.io/open-source/core-functionality/chunking
 from unstructured.chunking.basic import chunk_elements
 from unstructured.chunking.title import chunk_by_title
-from utils.logger_manager import get_logger
+from apps.utils.logger_manager import get_logger
 from unstructured.partition.auto import partition
 import os
 
