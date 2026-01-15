@@ -13,7 +13,7 @@ import time
 from typing import Dict, Tuple, Any
 from queue import Queue, Empty
 from threading import Lock
-from .schemas.progress_schema import SSELogEntry, LogLevel
+from .progress_schema import SSELogEntry, LogLevel
 
 # 内存版任务日志总线：每个 task_id 一个队列和递增序号（同步队列）
 _task_bus: Dict[str, Tuple[Queue, int]] = {}

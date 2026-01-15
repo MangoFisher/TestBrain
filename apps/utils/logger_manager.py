@@ -6,8 +6,8 @@ from pathlib import Path
 from django.conf import settings
 from contextvars import ContextVar
 from typing import Dict, List
-from apps.agents.progress_registry import set_progress
-from apps.agents.sse_bus import publish_log
+from .progress_registry import set_progress
+from .sse_bus import publish_log
 
 # ========= 任务上下文与镜像到进度（上移，供下方 LogManager 使用） ========
 

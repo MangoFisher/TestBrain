@@ -2,11 +2,11 @@ from typing import Dict, Any, List, Optional
 import json
 import logging
 
-from ..llm.base import BaseLLMService
-from ..knowledge.service import KnowledgeService
+from apps.llm.base import BaseLLMService
+from apps.knowledge.service import KnowledgeService
 from .prompts import PrdAnalyserPrompt
 from langchain_core.messages import SystemMessage, HumanMessage
-from utils.logger_manager import get_logger
+from apps.utils.logger_manager import get_logger
 
 class PrdAnalyserAgent:
     """PRD分析Agent，用于从PRD文档中提取测试点和测试场景"""

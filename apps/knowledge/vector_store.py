@@ -4,7 +4,7 @@ import numpy as np
 from typing import List, Dict, Any, Optional
 import os
 from django.conf import settings
-from utils.logger_manager import get_logger
+from apps.utils.logger_manager import get_logger
 
 logger = get_logger(__name__)
 

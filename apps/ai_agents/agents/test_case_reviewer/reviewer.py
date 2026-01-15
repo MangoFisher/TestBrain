@@ -2,12 +2,12 @@ from typing import Dict, Any, List
 import json
 import logging
 
-from ..llm.base import BaseLLMService
-from ..knowledge.service import KnowledgeService 
-from ..core.models import TestCase
+from apps.llm.base import BaseLLMService
+from apps.knowledge.service import KnowledgeService
+from apps.core.models import TestCase
 from .prompts import TestCaseReviewerPrompt
 from langchain_core.messages import SystemMessage, HumanMessage
-from utils.logger_manager import get_logger
+from apps.utils.logger_manager import get_logger
 
 
 

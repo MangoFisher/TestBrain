@@ -6,7 +6,7 @@ import json
 from typing import List
 from pydantic import ValidationError
 from langchain.output_parsers import PydanticOutputParser
-from ..schemas.api_test_case_schema import MinimalCase
+from .api_test_case_schema import MinimalCase
 
 # 建立 Pydantic 解析器
 api_test_case_parser = PydanticOutputParser(pydantic_object=MinimalCase)

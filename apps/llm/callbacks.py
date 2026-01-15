@@ -1,5 +1,5 @@
 from langchain.callbacks.base import BaseCallbackHandler
-from utils.logger_manager import get_logger
+from apps.utils.logger_manager import get_logger
 
 class LoggingCallbackHandler(BaseCallbackHandler):
     """日志记录回调处理器"""
