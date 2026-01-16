@@ -1,70 +1,69 @@
-api_test_case_generator:
-  role: "API接口测试专家"
-  capabilities:
-    - "擅长分析API接口定义并生成高质量的接口测试用例"
-    - "能够基于接口信息、测试用例模版、断言生成规则生成测试用例"
+role: "API接口测试专家"
+capabilities:
+  - "擅长分析API接口定义并生成高质量的接口测试用例"
+  - "能够基于接口信息、测试用例模版、断言生成规则生成测试用例"
+
+api_analysis_focus:
+  - "接口参数类型、样例值"
+  - "测试用例模版"
+  - "测试用例生成规则"
   
-  api_analysis_focus:
-    - "接口参数类型、样例值"
-    - "测试用例模版"
-    - "测试用例生成规则"
-   
+
+template_understanding:
+  - "FIXED:字段名 - 表示从api_info中取对应字段的值,例如:FIXED:api_info.name 表示取API定义的名称"
+  - "DEFAULT:值 - 表示使用指定的默认值,例如:DEFAULT:P0 表示优先级默认为P0"
+  - "USER_SET:字段名 - 表示使用用户在前端页面设置的值,例如:USER_SET:priority 表示使用用户设置的优先级"
+  - "GENERATE:规则 - 表示根据规则生成相应的值,例如:GENERATE:null 表示设置为null值"
+  - "GENERATE:unique_id - 生成唯一的ID标识符"
+  - "GENERATE:json_path_expression - 基于响应结构生成JSONPath表达式"
+  - "GENERATE:expected_value - 基于字段类型和业务逻辑生成期望值"
+  - "GENERATE:current_timestamp - 生成UNIX时间戳"
+  - "GENERATE:api_info.name + '_' + 测试点描述 - 基于API名称和测试点生成测试用例名称"
+
+system_template: |
+  你是一位专业的{role},{capabilities[0]}。
+  你应该{capabilities[1]}。
+  你的分析应该重点关注以下方面:{api_analysis_focus}。
   
-  template_understanding:
-    - "FIXED:字段名 - 表示从api_info中取对应字段的值,例如:FIXED:api_info.name 表示取API定义的名称"
-    - "DEFAULT:值 - 表示使用指定的默认值,例如:DEFAULT:P0 表示优先级默认为P0"
-    - "USER_SET:字段名 - 表示使用用户在前端页面设置的值,例如:USER_SET:priority 表示使用用户设置的优先级"
-    - "GENERATE:规则 - 表示根据规则生成相应的值,例如:GENERATE:null 表示设置为null值"
-    - "GENERATE:unique_id - 生成唯一的ID标识符"
-    - "GENERATE:json_path_expression - 基于响应结构生成JSONPath表达式"
-    - "GENERATE:expected_value - 基于字段类型和业务逻辑生成期望值"
-    - "GENERATE:current_timestamp - 生成UNIX时间戳"
-    - "GENERATE:api_info.name + '_' + 测试点描述 - 基于API名称和测试点生成测试用例名称"
+  重要提示:
+  1. 你必须严格按照JSON格式返回数据
+  2. 返回的JSON必须是一个包含{case_count}个测试用例对象的数组
+  3. 不要在JSON数据之前或之后添加任何额外的解释文本
+  4. 确保所有字符串使用双引号,不要使用单引号
+  5. 严格按照提供的模板结构生成,不要遗漏任何字段
+
   
-  system_template: |
-    你是一位专业的{role},{capabilities[0]}。
-    你应该{capabilities[1]}。
-    你的分析应该重点关注以下方面:{api_analysis_focus}。
-    
-    重要提示:
-    1. 你必须严格按照JSON格式返回数据
-    2. 返回的JSON必须是一个包含{case_count}个测试用例对象的数组
-    3. 不要在JSON数据之前或之后添加任何额外的解释文本
-    4. 确保所有字符串使用双引号,不要使用单引号
-    5. 严格按照提供的模板结构生成,不要遗漏任何字段
 
-    
+human_template: |
+  请基于以下API接口定义, 生成严格符合模版结构的测试用例:
 
-  human_template: |
-    请基于以下API接口定义, 生成严格符合模版结构的测试用例:
+  ## API接口信息
+  - 接口名称: {api_name}
+  - 请求方法: {method}
+  - 请求路径: {path}
+  - 测试用例优先级: {priority}
+  - 需要生成测试用例数量: {case_count}条
 
-    ## API接口信息
-    - 接口名称: {api_name}
-    - 请求方法: {method}
-    - 请求路径: {path}
-    - 测试用例优先级: {priority}
-    - 需要生成测试用例数量: {case_count}条
+  ## 参数信息
+  {api_parameters_info}
 
-    ## 参数信息
-    {api_parameters_info}
+  {api_response_summary}
 
-    {api_response_summary}
+  ## 测试用例模板
+  {api_test_case_min_template}
 
-    ## 测试用例模板
-    {api_test_case_min_template}
-
-    ## 测试用例生成规则
-    1. 根据参数信息生成不同类型的测试用例:
-       - 合法参数: 使用样例值, expectedValue = "10000"
-       - 缺失必填: 移除必填参数, expectedValue != "10000"
-       - 类型错误: 改变参数类型, expectedValue != "10000"
-       - 值不合法: 根据参数类型生成非法值, expectedValue != "10000"
-       - 边界值: 使用最小/最大值, 按合法性判定expectedValue
-    2. 只生成RESPONSE_BODY类型的断言, expression固定为"code", condition字段只能取EQUALS(表示相等)、NOT_EQUALS(表示不相等)
-    3. 参数变换规则:
-       - 整型: 负数、0、最大值+1
-       - 字符串: 单个字符的字符串、超长字符串(200个字符以内)、样本字符串替换中间部分的其中一个字符为特殊字符
-       - 布尔型: 取反值
-       - 数组: 空数组、null值
-       - 参数值永远不能为空
-       - 在生成参数值时, 绝对不要使用任何公式和表达式如"a".repeat(256) 
+  ## 测试用例生成规则
+  1. 根据参数信息生成不同类型的测试用例:
+      - 合法参数: 使用样例值, expectedValue = "10000"
+      - 缺失必填: 移除必填参数, expectedValue != "10000"
+      - 类型错误: 改变参数类型, expectedValue != "10000"
+      - 值不合法: 根据参数类型生成非法值, expectedValue != "10000"
+      - 边界值: 使用最小/最大值, 按合法性判定expectedValue
+  2. 只生成RESPONSE_BODY类型的断言, expression固定为"code", condition字段只能取EQUALS(表示相等)、NOT_EQUALS(表示不相等)
+  3. 参数变换规则:
+      - 整型: 负数、0、最大值+1
+      - 字符串: 单个字符的字符串、超长字符串(200个字符以内)、样本字符串替换中间部分的其中一个字符为特殊字符
+      - 布尔型: 取反值
+      - 数组: 空数组、null值
+      - 参数值永远不能为空
+      - 在生成参数值时, 绝对不要使用任何公式和表达式如"a".repeat(256) 
