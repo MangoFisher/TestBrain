@@ -1,11 +1,55 @@
-from ..base_prompts import PromptTemplateManager
-from typing import Dict, Any
+from pathlib import Path
+import yaml
+import json
+from typing import Dict, Any, List
+from langchain.prompts import ChatPromptTemplate
+from langchain.prompts.chat import SystemMessagePromptTemplate, HumanMessagePromptTemplate
+from ..base_prompts import BasePromptManager
+
+
+class APITestCaseGeneratorPromptManager(BasePromptManager):
+    """API测试用例生成提示词管理器"""
+    
+    def __init__(self, config_path: str):
+        """初始化，加载配置文件"""
+        with open(config_path, "r", encoding="utf-8") as f:
+            self.config = yaml.safe_load(f)
+    
+    def get_api_test_case_generator_prompt(self) -> ChatPromptTemplate:
+        """获取API测试用例生成的提示词模板"""
+        config = self.config
+        
+        # 准备系统消息的变量并格式化模板
+        system_vars = {
+            'role': config['role'],
+            'capabilities': config['capabilities'],
+            'api_analysis_focus': ', '.join(config['api_analysis_focus']),
+            'template_understanding': '\n'.join(config['template_understanding']),
+            'case_count': '{case_count}'
+        }
+        
+        # 创建系统消息模板
+        system_template_formatted = config['system_template'].format(**system_vars)
+        system_message_prompt = SystemMessagePromptTemplate.from_template(system_template_formatted)
+        
+        # 创建人类消息模板
+        human_message_prompt = HumanMessagePromptTemplate.from_template(config['human_template'])
+        
+        # 组合成聊天提示词模板
+        return ChatPromptTemplate.from_messages([
+            system_message_prompt,
+            human_message_prompt
+        ])
+
 
 class APITestCaseGeneratorPrompt:
     """API测试用例生成提示词"""
     
     def __init__(self):
-        self.prompt_manager = PromptTemplateManager()
+        # 获取当前文件所在目录的configs子目录下的配置文件
+        config_path = Path(__file__).parent / "configs" / "prompt_config.yaml"
+        # 初始化具体的提示词模板管理器
+        self.prompt_manager = APITestCaseGeneratorPromptManager(str(config_path))
         self.prompt_template = self.prompt_manager.get_api_test_case_generator_prompt()
     
     def format_messages(self, api_info: Dict[str, Any], priority: str, 
@@ -18,7 +62,7 @@ class APITestCaseGeneratorPrompt:
             api_info: API接口信息
             priority: 测试用例优先级
             case_count: 生成测试用例数量
-            test_case_template: 测试用例结构模板
+            api_test_case_min_template: 测试用例结构模板
             include_format_instructions: 是否包含格式说明（用于重试）
             case_rule_override: 自定义测试用例生成规则（Markdown格式），用于覆盖模板中的默认规则（可选）
             
@@ -48,27 +92,31 @@ class APITestCaseGeneratorPrompt:
             for msg in reversed(messages):
                 if hasattr(msg, 'content'):
                     content = msg.content
-                    idx = content.find(marker)
-                    if idx >= 0:
-                        msg.content = content[:idx] + override_text
-                    else:
-                        msg.content += f"\n\n{override_text}"
+                    if isinstance(content, str):
+                        idx = content.find(marker)
+                        if idx >= 0:
+                            msg.content = content[:idx] + override_text
+                        else:
+                            msg.content = content + f"\n\n{override_text}"
                     break
         
         # 如果需要格式说明（重试时），追加到最后一个 HumanMessage
         if include_format_instructions:
-            from .parsers.api_test_case_parser import get_format_instructions
-            format_instr = get_format_instructions()
-            format_extra = f"\n\n重要要求：\n- 只输出 JSON，不要任何解释性文本\n- 严格遵守以下格式说明：\n{format_instr}"
-            
-            # 找到最后一个 HumanMessage 并追加格式说明
-            for msg in reversed(messages):
-                if hasattr(msg, 'content') and hasattr(msg, 'type') and msg.type == 'human':
-                    msg.content += format_extra
-                    break
-                elif hasattr(msg, 'content') and hasattr(msg, 'role') and msg.role == 'user':
-                    msg.content += format_extra
-                    break
+            # 尝试导入格式说明
+            try:
+                from .api_test_case_parser import get_format_instructions
+                format_instr = get_format_instructions()
+                format_extra = f"\n\n重要要求：\n- 只输出 JSON，不要任何解释性文本\n- 严格遵守以下格式说明：\n{format_instr}"
+                
+                # 找到最后一个 HumanMessage 并追加格式说明
+                for msg in reversed(messages):
+                    if hasattr(msg, 'content') and hasattr(msg, 'type') and msg.type == 'human':
+                        if isinstance(msg.content, str):
+                            msg.content += format_extra
+                        break
+            except ImportError:
+                # 如果无法导入格式说明，则跳过这部分
+                pass
         
         return messages
     
