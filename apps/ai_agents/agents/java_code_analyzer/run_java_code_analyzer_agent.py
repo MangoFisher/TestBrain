@@ -26,22 +26,6 @@ def main():
     parser = argparse.ArgumentParser(
         description="使用 LangChain 框架运行测试范围分析 Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-示例:
-
-1. 使用 DeepSeek 推理模型（默认，推荐）:
-    export OPENAI_API_KEY="sk-..."
-    python agent/java_code_analyzer_agent.py /path/to/repo abc123 def456
-
-2. 使用 DeepSeek 对话模型（更快）:
-    export OPENAI_API_KEY="sk-..."
-    python agent/java_code_analyzer_agent.py /path/to/repo abc123 def456 --model deepseek-chat
-
-3. 使用 OpenAI:
-    export OPENAI_API_KEY="sk-..."
-    export OPENAI_BASE_URL=""  # 清空，使用官方地址
-    python agent/java_code_analyzer_agent.py /path/to/repo abc123 def456 --model gpt-4o
-        """
     )
     
     parser.add_argument("repo_path", nargs='?', help="Java 项目路径", default="/Users/zhangxiaoguo/Documents/java-callgraph2")
@@ -98,7 +82,7 @@ def main():
             api_key=api_key,
             base_url=base_url,
             model=model,
-            api_base_url=args.api_url,
+            java_analyzer_service_url=args.api_url,
             max_iterations=args.max_iterations,
             verbose=not args.quiet
         )

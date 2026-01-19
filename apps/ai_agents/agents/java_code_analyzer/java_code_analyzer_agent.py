@@ -19,10 +19,9 @@ class JavaCodeAnalyzerAgent:
         repo_path: str,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        model: str = "deepseek-reasoner",
-        # model: str = "deepseek-chat",
-        api_base_url: str = "http://localhost:8089",
-        max_iterations: int = 15,
+        model: str = "deepseek-chat",
+        java_analyzer_service_url: str = "http://localhost:8089",
+        max_iterations: int = 15, # 默认的React Agent迭代次数
         verbose: bool = True
     ):
         """
@@ -33,7 +32,7 @@ class JavaCodeAnalyzerAgent:
             api_key: DeepSeek API 密钥（或其他兼容 OpenAI API 的密钥）
             base_url: API 基础 URL（DeepSeek: https://api.deepseek.com）
             model: 模型名称（默认: deepseek-reasoner，推理模型）
-            api_base_url: 分析 API 基础 URL
+            java_analyzer_service_url: java源码分析服务URL
             max_iterations: 最大迭代次数
             verbose: 是否输出详细日志
         """
@@ -72,7 +71,7 @@ class JavaCodeAnalyzerAgent:
         self.llm = LLMServiceFactory.create(provider, **llm_config)
         
         # 创建工具
-        self.tools = create_langchain_tools(repo_path, api_base_url)
+        self.tools = create_langchain_tools(repo_path, java_analyzer_service_url)
         
         # 获取系统提示词
         system_prompt = self.prompt_manager.get_system_prompt()

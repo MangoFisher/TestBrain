@@ -614,21 +614,21 @@ class FindFileTool(BaseTool):
 
 def create_langchain_tools(
     repo_path: str,
-    api_base_url: str = "http://localhost:8089"
+    java_analyzer_service_url: str = "http://localhost:8089"
 ) -> List[BaseTool]:
     """
     创建所有 LangChain 工具。
     
     Args:
         repo_path: 项目路径
-        api_base_url: API 基础 URL
+        java_analyzer_service_url: java源码分析服务URL
         
     Returns:
         工具列表
     """
     from .tools import get_all_tools
     
-    tools_instances = get_all_tools(repo_path, api_base_url)
+    tools_instances = get_all_tools(repo_path, java_analyzer_service_url)
     git = tools_instances["git"]
     api = tools_instances["api"]
     source = tools_instances["source"]

@@ -675,19 +675,19 @@ class SourceCodeTools:
             return {"error": f"搜索失败: {str(e)}"}
 
 
-def get_all_tools(repo_path: str, api_base_url: str = "http://localhost:8089") -> Dict[str, Any]:
+def get_all_tools(repo_path: str, java_analyzer_service_url: str = "http://localhost:8089") -> Dict[str, Any]:
     """
     获取所有工具实例。
     
     Args:
         repo_path: 项目路径
-        api_base_url: API 基础 URL
+        java_analyzer_service_url: java源码分析服务URL
         
     Returns:
         工具字典
     """
     return {
         "git": GitTools(repo_path),
-        "api": AnalyzerAPITools(api_base_url),
+        "api": AnalyzerAPITools(java_analyzer_service_url),
         "source": SourceCodeTools(repo_path)
     }
