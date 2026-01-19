@@ -10,8 +10,8 @@ from .java_code_analyzer_tools import create_langchain_tools
 from .prompts import JavaCodeAnalyzerPromptManager
 
 
-class LangChainTestAnalysisAgent:
-    """基于 LangChain 的测试范围分析 Agent"""
+class JavaCodeAnalyzerAgent:
+    """基于 LangChain 的 Java 代码分析 Agent"""
     
     def __init__(
         self,

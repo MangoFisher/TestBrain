@@ -21,7 +21,7 @@ from tools import GitTools
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from apps.ai_agents.agents.java_code_analyzer.java_code_analyzer_agent import LangChainTestAnalysisAgent
+from apps.ai_agents.agents.java_code_analyzer.java_code_analyzer_agent import JavaCodeAnalyzerAgent
 
 
 def main():
@@ -97,7 +97,7 @@ def main():
         git_tools.checkout_version(args.new_commit)
         print(f"✅ 已切换到: {args.new_commit}")
 
-        agent = LangChainTestAnalysisAgent(
+        agent = JavaCodeAnalyzerAgent(
             repo_path=args.repo_path,
             api_key=api_key,
             base_url=base_url,
