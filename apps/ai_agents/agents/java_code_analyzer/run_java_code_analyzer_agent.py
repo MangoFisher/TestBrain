@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 """
-使用 LangChain 框架运行测试范围分析 Agent。
+使用大模型agent调用基于javaParser实现的java源码分析服务,对java进行源码分析、并输出测试点建议和典型测试用例。
 
 使用方式:
-    python agent/java_code_analyzer_agent.py <repo_path> <base_commit> <new_commit>
-
-环境变量:
-    OPENAI_API_KEY: DeepSeek/OpenAI API 密钥（必需）
-    OPENAI_BASE_URL: API 地址（可选，默认 https://api.deepseek.com）
-    OPENAI_MODEL: 模型名称（可选，默认 deepseek-reasoner）
+    python agent/java_code_analyzer_agent.py <repo_path> <base_commit> <new_commit>如:
+    python java_code_analyzer/run_java_code_analyzer_agent.py /Users/zhangxiaoguo/Documents/vv-education-service 95291763 4cbb6ab4 --model deepseek-chat
 """
 
 import sys

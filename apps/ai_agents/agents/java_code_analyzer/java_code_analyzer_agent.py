@@ -8,6 +8,7 @@ from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
 from .java_code_analyzer_tools import create_langchain_tools
 from .prompts import JavaCodeAnalyzerPromptManager
+from apps.llm.base import LLMServiceFactory
 
 
 class JavaCodeAnalyzerAgent:
@@ -47,19 +48,28 @@ class JavaCodeAnalyzerAgent:
         if base_url is None:
             base_url = "https://api.deepseek.com"
         
-        # 根据是否有api_key创建不同的ChatOpenAI实例
+        # 使用 LLMServiceFactory 创建 LLM 服务实例
+        llm_config = {
+            "model": model,
+            "base_url": base_url,
+        }
         if api_key:
-            if "reasoner" not in model.lower():
-                # 推理模型不支持 temperature 参数
-                self.llm = ChatOpenAI(model=model, base_url=base_url, api_key=api_key)  # type: ignore
-            else:
-                # 对话模型支持 temperature 参数
-                self.llm = ChatOpenAI(model=model, base_url=base_url, api_key=api_key, temperature=0.7)  # type: ignore
+            llm_config["api_key"] = api_key
+        
+        # 根据模型类型决定是否添加 temperature 参数
+        if "reasoner" not in model.lower():
+            # 推理模型不支持 temperature 参数
+            pass
         else:
-            if "reasoner" not in model.lower():
-                self.llm = ChatOpenAI(model=model, base_url=base_url)  # type: ignore
-            else:
-                self.llm = ChatOpenAI(model=model, base_url=base_url, temperature=0.7)  # type: ignore
+            # 对话模型支持 temperature 参数
+            llm_config["temperature"] = 0.7  # type: ignore
+        
+        # 从模型名称推断提供商 (如 deepseek-chat, deepseek-reasoner -> deepseek)
+        provider = model.split('-')[0].lower()
+        if provider not in ['deepseek', 'qwen']:
+            provider = 'deepseek'  # 默认使用 deepseek
+        
+        self.llm = LLMServiceFactory.create(provider, **llm_config)
         
         # 创建工具
         self.tools = create_langchain_tools(repo_path, api_base_url)
@@ -96,7 +106,7 @@ class JavaCodeAnalyzerAgent:
             print("="*70)
             print(f"📁 项目: {self.repo_path}")
             print(f"🔄 变更: {base_commit[:8]} → {new_commit[:8]}")
-            print(f"🧠 模型: {self.llm.model_name}")
+            print(f"🧠 模型: {getattr(self.llm, 'model_name', self.model)}")
             print("="*70)
             print()
         
