@@ -11,6 +11,7 @@ from apps.ai_agents.agents.test_case_reviewer.reviewer import TestCaseReviewerAg
 from apps.ai_agents.agents.prd_analyzer.analyser import PrdAnalyserAgent
 from apps.ai_agents.agents.api_case_generator.api_case_generator import APITestCaseGeneratorAgent, parse_api_definitions,generate_test_cases_for_apis
 from apps.ai_agents.agents.java_code_analyzer.java_code_analyzer_agent import JavaCodeAnalyzerAgent
+from apps.ai_agents.agents.java_code_analyzer.tools import GitTools
 from apps.ai_agents.agents.api_case_generator.prompts import APITestCaseGeneratorPrompt
 from apps.utils.progress_registry import get_progress as get_task_progress
 from ..knowledge.service import KnowledgeService
@@ -26,6 +27,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import os
 from datetime import datetime
+from pathlib import Path
 import time
 from .milvus_helper import get_embedding_model, init_milvus_collection, process_singel_file
 
@@ -1067,19 +1069,57 @@ def java_code_analyzer_service_api(request):
             verbose=True
         )
         
-        # 执行分析
-        result = analyzer_agent.analyze(base_commit, new_commit)
-        
-        if result.get('success'):
-            analysis_result = result.get('output', '分析完成，但没有返回详细结果')
-        else:
-            analysis_result = result.get('error', '分析失败')
-        
-        return JsonResponse({
-            'success': True,
-            'result': analysis_result
-        })
-        
+        git_tools = GitTools(repo_path)
+        output_dir = Path(settings.BASE_DIR) / "outputs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        repo_identifier = Path(repo_path).name or "repo"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"{repo_identifier}_analyzer_{base_commit[:8]}_{new_commit[:8]}_{timestamp}.md"
+        output_path = output_dir / output_filename
+
+        original_ref = None
+        report_content = ""
+
+        try:
+            logger.info("拉取最新代码...")
+            git_tools.pull_latest()
+
+            logger.info("记录当前 Git 状态...")
+            original_ref = git_tools.get_current_ref()
+            logger.info(f"当前引用: {original_ref}")
+
+            logger.info(f"切换到目标版本: {new_commit}")
+            git_tools.checkout_version(new_commit)
+            logger.info(f"已切换到: {new_commit}")
+
+            result = analyzer_agent.analyze(base_commit, new_commit)
+
+            if result.get('success'):
+                report_content = result.get('output', '')
+                if report_content:
+                    output_path.write_text(report_content, encoding='utf-8')
+                    logger.info(f"分析报告已写入: {output_path}")
+                return JsonResponse({
+                    'success': True,
+                    'result': report_content or '分析完成，但没有返回详细结果',
+                    'report_path': str(output_path)
+                })
+
+            error_msg = result.get('error', '分析失败')
+            logger.error(f"分析失败: {error_msg}")
+            return JsonResponse({
+                'success': False,
+                'error': error_msg
+            }, status=500)
+
+        finally:
+            if original_ref:
+                try:
+                    git_tools.checkout_version(original_ref)
+                    logger.info(f"已恢复到原始引用: {original_ref}")
+                except Exception as restore_error:
+                    logger.error(f"恢复原始引用失败: {restore_error}")
+
     except json.JSONDecodeError:
         logger.error("JSON解析错误", exc_info=True)
         return JsonResponse({

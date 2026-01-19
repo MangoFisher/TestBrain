@@ -574,7 +574,7 @@ class ListDirectoryTool(BaseTool):
 class FindFileInput(BaseModel):
     """查找文件的输入"""
     pattern: str = Field(description="文件名模式，支持通配符。例如: 'pom.xml', '*.xml', '**/*.properties'")
-    max_results: int = Field(default=20, description="最多返回的结果数，默认 20")
+    max_results: int = Field(default=200, description="最多返回的结果数，默认 200")
 
 
 class FindFileTool(BaseTool):
@@ -597,12 +597,12 @@ class FindFileTool(BaseTool):
 💡 提示：
 - 支持通配符 * 和 ?
 - 递归搜索整个项目
-- 默认最多返回 20 个结果"""
+- 默认最多返回 200 个结果"""
     args_schema: Type[BaseModel] = FindFileInput
     
     source_tools: SourceCodeTools = Field(default=None, exclude=True)
     
-    def _run(self, pattern: str, max_results: int = 20) -> str:
+    def _run(self, pattern: str, max_results: int = 200) -> str:
         result = self.source_tools.find_file(pattern, max_results)
         import json
         return json.dumps(result, ensure_ascii=False, indent=2)
