@@ -13,7 +13,7 @@ urlpatterns = [
     #知识库文件上传页面
     path('upload/', views.upload_single_file, name='upload_single_file'),
     #PRD分析页面
-    path('analyser/', views.prd_analyser, name='prd_analyser'),
+    path('prd_analyzer/', views.prd_analyzer, name='prd_analyzer'),
     #接口case生成页面
     path('api_case_generate/', views.api_case_generate, name='api_case_generate'),
     #Java源码分析页面

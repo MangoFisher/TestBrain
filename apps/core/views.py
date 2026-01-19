@@ -782,10 +782,10 @@ def delete_test_cases(request):
             'message': f'删除失败: {str(e)}'
         }) 
     
-def prd_analyser(request):
+def prd_analyzer(request):
     """从PRD文件中提取测试点&测试场景"""
     if request.method == 'GET':
-        return render(request, 'analyser.html')
+        return render(request, 'prd_analyzer.html')
     elif request.method == 'POST':
         if 'single_file' in request.FILES:  # 修改这里匹配前端的 name 属性
             uploaded_file = request.FILES['single_file']  # 修改这里匹配前端的 name 属性
