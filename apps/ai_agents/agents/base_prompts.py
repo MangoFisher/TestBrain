@@ -1,7 +1,7 @@
 """提示词管理基类"""
 
-from langchain.prompts import ChatPromptTemplate
-from langchain.prompts.chat import SystemMessagePromptTemplate, HumanMessagePromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts.chat import SystemMessagePromptTemplate, HumanMessagePromptTemplate
 
 
 class BasePromptManager:

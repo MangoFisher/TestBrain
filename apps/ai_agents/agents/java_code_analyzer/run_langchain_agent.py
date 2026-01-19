@@ -17,11 +17,12 @@ import argparse
 from pathlib import Path
 from tools import GitTools
 
-# 添加父目录到路径
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# 添加项目根目录到路径
+project_root = Path(__file__).parent.parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 # from agent.langchain_agent import LangChainTestAnalysisAgent
-from java_code_analyzer.langchain_agent import LangChainTestAnalysisAgent
+from apps.ai_agents.agents.java_code_analyzer.langchain_agent import LangChainTestAnalysisAgent
 
 
 def main():
