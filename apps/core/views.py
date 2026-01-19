@@ -1023,7 +1023,7 @@ def java_code_analyzer(request):
 
 
 @require_http_methods(["POST"])
-def java_code_analysis_api(request):
+def java_code_analyzer_service_api(request):
     """Java源码分析API接口"""
     try:
         data = json.loads(request.body)
@@ -1031,9 +1031,9 @@ def java_code_analysis_api(request):
         base_commit = data.get('base_commit')
         new_commit = data.get('new_commit')
         llm_provider = data.get('llm_provider', DEFAULT_PROVIDER)
-        model = data.get('model', 'deepseek-reasoner')
+        # model 参数将从 settings 配置中获取，无需显式传递
         
-        logger.info(f"Java代码分析请求: 服务={target_service}, 基础提交={base_commit}, 新提交={new_commit}, LLM提供商={llm_provider}, 模型={model}")
+        logger.info(f"Java代码分析请求: 服务={target_service}, 基础提交={base_commit}, 新提交={new_commit}, LLM提供商={llm_provider}")
         
         # 验证参数
         if not target_service or not base_commit or not new_commit:
@@ -1045,7 +1045,6 @@ def java_code_analysis_api(request):
         # 使用工厂创建选定的LLM服务
         llm_service = LLMServiceFactory.create(
             provider=llm_provider,
-            model=model,
             **PROVIDERS.get(llm_provider, {})
         )
         
@@ -1063,8 +1062,7 @@ def java_code_analysis_api(request):
             repo_path=repo_path,
             api_key=getattr(settings, f'{llm_provider.upper()}_API_KEY', None),
             base_url=getattr(settings, f'{llm_provider.upper()}_BASE_URL', None),
-            model=model,
-            api_base_url=getattr(settings, 'JAVA_ANALYZER_SERVICE_URL', 'http://localhost:8089'),
+            java_analyzer_service_url=getattr(settings, 'JAVA_ANALYZER_SERVICE_URL', 'http://localhost:8089'),
             max_iterations=15,
             verbose=True
         )

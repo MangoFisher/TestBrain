@@ -20,7 +20,6 @@ class JavaCodeAnalyzerAgent:
         repo_path: str,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        model: str = "deepseek-chat",
         java_analyzer_service_url: str = getattr(settings, 'JAVA_ANALYZER_SERVICE_URL', 'http://localhost:8089'),
         max_iterations: int = 15, # 默认的React Agent迭代次数
         verbose: bool = True
@@ -32,14 +31,12 @@ class JavaCodeAnalyzerAgent:
             repo_path: 项目路径
             api_key: DeepSeek API 密钥（或其他兼容 OpenAI API 的密钥）
             base_url: API 基础 URL（DeepSeek: https://api.deepseek.com）
-            model: 模型名称（默认: deepseek-reasoner，推理模型）
             java_analyzer_service_url: java源码分析服务URL (从settings.JAVA_ANALYZER_SERVICE_URL获取，如果未设置则使用默认值)
             max_iterations: 最大迭代次数
             verbose: 是否输出详细日志
         """
         self.repo_path = repo_path
         self.verbose = verbose
-        self.model = model
         
         # 初始化提示词管理器
         self.prompt_manager = JavaCodeAnalyzerPromptManager()
@@ -48,28 +45,38 @@ class JavaCodeAnalyzerAgent:
         if base_url is None:
             base_url = "https://api.deepseek.com"
         
-        # 使用 LLMServiceFactory 创建 LLM 服务实例
-        llm_config = {
+        # 从 settings 获取默认配置
+        from django.conf import settings
+        llm_config = getattr(settings, 'LLM_PROVIDERS', {})
+        default_provider = llm_config.get('default_provider', 'deepseek')
+        provider_config = llm_config.get(default_provider, {})
+        
+        # 获取模型配置
+        model = provider_config.get('model', 'deepseek-chat')
+        self.model = model  # 保存模型名称用于显示
+        
+        # 构建 LLM 配置
+        llm_params = {
             "model": model,
             "base_url": base_url,
         }
         if api_key:
-            llm_config["api_key"] = api_key
-        
+            llm_params["api_key"] = api_key
+            
         # 根据模型类型决定是否添加 temperature 参数
         if "reasoner" not in model.lower():
             # 推理模型不支持 temperature 参数
             pass
         else:
             # 对话模型支持 temperature 参数
-            llm_config["temperature"] = 0.7  # type: ignore
+            llm_params["temperature"] = provider_config.get('temperature', 0.7)
         
-        # 从模型名称推断提供商 (如 deepseek-chat, deepseek-reasoner -> deepseek)
+        # 从模型名称推断提供商
         provider = model.split('-')[0].lower()
         if provider not in ['deepseek', 'qwen']:
             provider = 'deepseek'  # 默认使用 deepseek
         
-        self.llm = LLMServiceFactory.create(provider, **llm_config)
+        self.llm = LLMServiceFactory.create(provider, **llm_params)
         
         # 创建工具
         self.tools = create_langchain_tools(repo_path, java_analyzer_service_url)

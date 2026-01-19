@@ -53,7 +53,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const baseCommit = document.getElementById('baseCommit').value;
         const newCommit = document.getElementById('newCommit').value;
         const llmProvider = document.getElementById('llmProvider').value;
-        const model = document.getElementById('model').value;
         
         // 验证输入
         if (!targetService || !baseCommit || !newCommit) {
@@ -69,7 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showLoading();
             
             // 发送分析请求
-            const response = await fetch('/api/java-code-analysis/', {
+            const response = await fetch('/api/java-code-analyzer-service/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -79,8 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     target_service: targetService,
                     base_commit: baseCommit,
                     new_commit: newCommit,
-                    llm_provider: llmProvider,
-                    model: model
+                    llm_provider: llmProvider
                 })
             });
             

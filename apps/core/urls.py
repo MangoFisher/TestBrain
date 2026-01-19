@@ -39,5 +39,5 @@ urlpatterns = [
     path('api/testcase-rule-template/', views.get_testcase_rule_template, name='get_testcase_rule_template'), # 获取规则模板
     path('api/stream-logs/', stream_logs, name='stream_logs'),
     # Java源码分析API
-    path('api/java-code-analysis/', views.java_code_analysis_api, name='java_code_analysis_api'),
+    path('api/java-code-analyzer-service/', views.java_code_analyzer_service_api, name='java_code_analyzer_service_api'),
 ] 
