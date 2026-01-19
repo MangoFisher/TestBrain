@@ -9,6 +9,7 @@ from langchain_openai import ChatOpenAI
 from .java_code_analyzer_tools import create_langchain_tools
 from .prompts import JavaCodeAnalyzerPromptManager
 from apps.llm.base import LLMServiceFactory
+from django.conf import settings
 
 
 class JavaCodeAnalyzerAgent:
@@ -20,7 +21,7 @@ class JavaCodeAnalyzerAgent:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         model: str = "deepseek-chat",
-        java_analyzer_service_url: str = "http://localhost:8089",
+        java_analyzer_service_url: str = getattr(settings, 'JAVA_ANALYZER_SERVICE_URL', 'http://localhost:8089'),
         max_iterations: int = 15, # 默认的React Agent迭代次数
         verbose: bool = True
     ):
@@ -32,7 +33,7 @@ class JavaCodeAnalyzerAgent:
             api_key: DeepSeek API 密钥（或其他兼容 OpenAI API 的密钥）
             base_url: API 基础 URL（DeepSeek: https://api.deepseek.com）
             model: 模型名称（默认: deepseek-reasoner，推理模型）
-            java_analyzer_service_url: java源码分析服务URL
+            java_analyzer_service_url: java源码分析服务URL (从settings.JAVA_ANALYZER_SERVICE_URL获取，如果未设置则使用默认值)
             max_iterations: 最大迭代次数
             verbose: 是否输出详细日志
         """

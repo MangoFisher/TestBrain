@@ -173,7 +173,12 @@ EMBEDDING_CONFIG = {
     'api_url': 'https://api-inference.huggingface.co/models/BAAI/bge-m3',
 }
 
+# java源码分析服务调用地址
+JAVA_ANALYZER_SERVICE_URL = "http://localhost:8089"
+
 # Hugging Face 的tokenizers库使用了多进程机制;
 # 在自己的逻辑中使用时，需要注意在进程fork之前不要使用tokenizers库,否则可能会引起死锁
 # 在Django启动时设置环境变量为false,禁止tokenizers库使用多进程
 os.environ["TOKENIZERS_PARALLELISM"] = "false" 
+
+
