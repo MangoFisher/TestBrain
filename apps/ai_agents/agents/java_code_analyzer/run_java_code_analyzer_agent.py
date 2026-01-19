@@ -3,7 +3,7 @@
 使用 LangChain 框架运行测试范围分析 Agent。
 
 使用方式:
-    python agent/run_langchain_agent.py <repo_path> <base_commit> <new_commit>
+    python agent/java_code_analyzer_agent.py <repo_path> <base_commit> <new_commit>
 
 环境变量:
     OPENAI_API_KEY: DeepSeek/OpenAI API 密钥（必需）
@@ -21,8 +21,7 @@ from tools import GitTools
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-# from agent.langchain_agent import LangChainTestAnalysisAgent
-from apps.ai_agents.agents.java_code_analyzer.langchain_agent import LangChainTestAnalysisAgent
+from apps.ai_agents.agents.java_code_analyzer.java_code_analyzer_agent import LangChainTestAnalysisAgent
 
 
 def main():
@@ -36,16 +35,16 @@ def main():
 
 1. 使用 DeepSeek 推理模型（默认，推荐）:
     export OPENAI_API_KEY="sk-..."
-    python agent/run_langchain_agent.py /path/to/repo abc123 def456
+    python agent/java_code_analyzer_agent.py /path/to/repo abc123 def456
 
 2. 使用 DeepSeek 对话模型（更快）:
     export OPENAI_API_KEY="sk-..."
-    python agent/run_langchain_agent.py /path/to/repo abc123 def456 --model deepseek-chat
+    python agent/java_code_analyzer_agent.py /path/to/repo abc123 def456 --model deepseek-chat
 
 3. 使用 OpenAI:
     export OPENAI_API_KEY="sk-..."
     export OPENAI_BASE_URL=""  # 清空，使用官方地址
-    python agent/run_langchain_agent.py /path/to/repo abc123 def456 --model gpt-4o
+    python agent/java_code_analyzer_agent.py /path/to/repo abc123 def456 --model gpt-4o
         """
     )
     

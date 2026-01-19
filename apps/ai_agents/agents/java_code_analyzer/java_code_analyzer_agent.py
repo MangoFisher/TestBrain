@@ -6,7 +6,7 @@
 from typing import Optional, List, Dict, Any
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
-from .langchain_tools import create_langchain_tools
+from .java_code_analyzer_tools import create_langchain_tools
 from .prompts import JavaCodeAnalyzerPromptManager
 
 
