@@ -130,6 +130,12 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link {% if '/java_code_analyzer/' in request.path %}active{% endif %}" href="/java_code_analyzer/">
+                        <i class="fas fa-code-branch"></i>
+                        Java源码分析
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link {% if '/knowledge/' in request.path %}active{% endif %}" href="/knowledge/">
                         <i class="fas fa-book"></i>
                         知识库管理(暂时不支持)

@@ -1,5 +1,6 @@
-from langchain.callbacks.base import BaseCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler
 from apps.utils.logger_manager import get_logger
+
 
 class LoggingCallbackHandler(BaseCallbackHandler):
     """日志记录回调处理器"""
@@ -19,4 +20,4 @@ class LoggingCallbackHandler(BaseCallbackHandler):
     
     def on_llm_error(self, error, **kwargs):
         """LLM生成出错时的回调"""
-        self.logger.error(f"LLM调用出错: {str(error)}") 
+        self.logger.error(f"LLM调用出错: {str(error)}")

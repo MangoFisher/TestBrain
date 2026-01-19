@@ -10,6 +10,7 @@ from apps.ai_agents.agents.test_case_generator.generator import TestCaseGenerato
 from apps.ai_agents.agents.test_case_reviewer.reviewer import TestCaseReviewerAgent
 from apps.ai_agents.agents.prd_analyzer.analyser import PrdAnalyserAgent
 from apps.ai_agents.agents.api_case_generator.api_case_generator import APITestCaseGeneratorAgent, parse_api_definitions,generate_test_cases_for_apis
+from apps.ai_agents.agents.java_code_analyzer.java_code_analyzer_agent import JavaCodeAnalyzerAgent
 from apps.ai_agents.agents.api_case_generator.prompts import APITestCaseGeneratorPrompt
 from apps.utils.progress_registry import get_progress as get_task_progress
 from ..knowledge.service import KnowledgeService
@@ -27,7 +28,7 @@ import os
 from datetime import datetime
 import time
 from .milvus_helper import get_embedding_model, init_milvus_collection, process_singel_file
-from langchain.text_splitter import CharacterTextSplitter
+
 import hashlib
 import numpy as np
 import gc
@@ -988,14 +989,14 @@ def get_generation_progress_api(request):
 
 
 def get_testcase_rule_template(request):
-    """返回模版中的“测试用例生成规则”文本（只读）"""
+    """返回模版中的"测试用例生成规则"文本（只读）"""
     try:
         # 直接读取 prompts_config.yaml 中 api_test_case_generator.human_template 的规则段
         # 为简单起见，这里复用 PromptTemplateManager 已加载的配置
         from ..agents.prompts import PromptTemplateManager
         mgr = PromptTemplateManager()
         cfg = mgr.config.get('api_test_case_generator') or {}
-        # 规则一般位于 human_template 中“## 测试用例生成规则”标题之后
+        # 规则一般位于 human_template 中"## 测试用例生成规则"标题之后
         human_tpl = cfg.get('human_template') or ''
         rule_text = ''
         if human_tpl:
@@ -1011,3 +1012,85 @@ def get_testcase_rule_template(request):
         return JsonResponse({'success': False, 'message': str(e)})
     
     
+def java_code_analyzer(request):
+    """Java源码分析页面视图"""
+    if request.method == 'GET':
+        context = {
+            'llm_providers': PROVIDERS,
+            'llm_provider': DEFAULT_PROVIDER,
+        }
+        return render(request, 'java_code_analyzer.html', context)
+
+
+@require_http_methods(["POST"])
+def java_code_analysis_api(request):
+    """Java源码分析API接口"""
+    try:
+        data = json.loads(request.body)
+        target_service = data.get('target_service')
+        base_commit = data.get('base_commit')
+        new_commit = data.get('new_commit')
+        llm_provider = data.get('llm_provider', DEFAULT_PROVIDER)
+        model = data.get('model', 'deepseek-reasoner')
+        
+        logger.info(f"Java代码分析请求: 服务={target_service}, 基础提交={base_commit}, 新提交={new_commit}, LLM提供商={llm_provider}, 模型={model}")
+        
+        # 验证参数
+        if not target_service or not base_commit or not new_commit:
+            return JsonResponse({
+                'success': False,
+                'error': '目标服务、基础提交和新提交均为必填项'
+            }, status=400)
+        
+        # 使用工厂创建选定的LLM服务
+        llm_service = LLMServiceFactory.create(
+            provider=llm_provider,
+            model=model,
+            **PROVIDERS.get(llm_provider, {})
+        )
+        
+        # 确定仓库路径（可以根据服务名称映射到实际路径）
+        # 这里可以根据实际情况调整仓库路径的确定逻辑
+        repo_path_mapping = {
+            'vv-education-service': '/Users/zhangxiaoguo/Documents/vv-education-service',
+            'java-callgraph2': '/Users/zhangxiaoguo/Documents/java-callgraph2',
+        }
+        
+        repo_path = repo_path_mapping.get(target_service, target_service)
+        
+        # 创建Java代码分析Agent实例
+        analyzer_agent = JavaCodeAnalyzerAgent(
+            repo_path=repo_path,
+            api_key=getattr(settings, f'{llm_provider.upper()}_API_KEY', None),
+            base_url=getattr(settings, f'{llm_provider.upper()}_BASE_URL', None),
+            model=model,
+            api_base_url=getattr(settings, 'JAVA_ANALYZER_SERVICE_URL', 'http://localhost:8089'),
+            max_iterations=15,
+            verbose=True
+        )
+        
+        # 执行分析
+        result = analyzer_agent.analyze(base_commit, new_commit)
+        
+        if result.get('success'):
+            analysis_result = result.get('output', '分析完成，但没有返回详细结果')
+        else:
+            analysis_result = result.get('error', '分析失败')
+        
+        return JsonResponse({
+            'success': True,
+            'result': analysis_result
+        })
+        
+    except json.JSONDecodeError:
+        logger.error("JSON解析错误", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': '无效的JSON数据'
+        }, status=400)
+    except Exception as e:
+        logger.error(f"Java代码分析时出错: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': f'分析失败: {str(e)}'
+        }, status=500)

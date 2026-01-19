@@ -4,7 +4,7 @@
 """
 
 from typing import Optional, Type, List, Dict, Any
-from langchain.tools import BaseTool
+from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 from .tools import GitTools, AnalyzerAPITools, SourceCodeTools
 

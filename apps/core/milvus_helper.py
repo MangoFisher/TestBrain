@@ -6,7 +6,7 @@ import pandas as pd
 from pymilvus import connections, Collection, DataType, utility, FieldSchema, CollectionSchema
 from sentence_transformers import SentenceTransformer
 from apps.knowledge.vector_store import MilvusVectorStore
-from langchain.text_splitter import CharacterTextSplitter
+
 from unstructured.partition.xlsx import partition_xlsx
 # chunking策略basic适合表格结构文件, by_title适合文档结构文件,具体可翻阅https://docs.unstructured.io/open-source/core-functionality/chunking
 from unstructured.chunking.basic import chunk_elements
@@ -40,9 +40,9 @@ def init_milvus_collection(collection_name="vv_knowledge_collection"):
             return Collection(name=collection_name)
         
         # 如果集合不存在，创建新集合
-        vector_store = MilvusVectorStore(collection_name)
-        collection =  vector_store.collection
-        
+        vector_store = MilvusVectorStore(collection_name=collection_name)
+        # 由于MilvusVectorStore类内部已经处理了集合创建，我们直接连接到已创建的集合
+        collection = Collection(name=collection_name)
         collection.load()
         
         return collection

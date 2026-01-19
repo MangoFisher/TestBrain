@@ -16,6 +16,8 @@ urlpatterns = [
     path('analyser/', views.prd_analyser, name='prd_analyser'),
     #接口case生成页面
     path('api_case_generate/', views.api_case_generate, name='api_case_generate'),
+    #Java源码分析页面
+    path('java_code_analyzer/', views.java_code_analyzer, name='java_code_analyzer'),
     #文件下载
     path('download_file/', views.download_file, name='download_file'),
     
@@ -36,4 +38,6 @@ urlpatterns = [
     path('api/get-generation-progress/', views.get_generation_progress_api, name='get_generation_progress'), #获取生成进度
     path('api/testcase-rule-template/', views.get_testcase_rule_template, name='get_testcase_rule_template'), # 获取规则模板
     path('api/stream-logs/', stream_logs, name='stream_logs'),
+    # Java源码分析API
+    path('api/java-code-analysis/', views.java_code_analysis_api, name='java_code_analysis_api'),
 ] 

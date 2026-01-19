@@ -5,7 +5,7 @@ LLM 最小输出的解析器模块
 import json
 from typing import List
 from pydantic import ValidationError
-from langchain.output_parsers import PydanticOutputParser
+from langchain_core.output_parsers import PydanticOutputParser
 from .api_test_case_schema import MinimalCase
 
 # 建立 Pydantic 解析器

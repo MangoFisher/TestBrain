@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}TestBrain - Java源码分析{% endblock %}
+
+{% block extra_css %}
+<style>
+    .analyzer-container {
+        margin: 20px;
+        padding: 20px;
+    }
+    
+    .analyzer-form {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-label {
+        font-weight: bold;
+        margin-bottom: 5px;
+        display: block;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    
+    .form-select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    
+    .submit-container {
+        text-align: center;
+        margin-top: 30px;
+    }
+    
+    .submit-button {
+        padding: 12px 40px;
+        font-size: 16px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .submit-button:hover {
+        background-color: #0056b3;
+    }
+    
+    .submit-button:disabled {
+        background-color: #6c757d;
+        cursor: not-allowed;
+    }
+    
+    .result-container {
+        margin-top: 30px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+        display: none;
+    }
+    
+    .loading {
+        display: none;
+        text-align: center;
+        margin-top: 20px;
+    }
+    
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #007bff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .error-message {
+        color: #dc3545;
+        margin-top: 10px;
+        display: none;
+    }
+    
+    .success-message {
+        color: #28a745;
+        margin-top: 10px;
+        display: none;
+    }
+    
+    .analysis-result {
+        margin-top: 20px;
+        white-space: pre-wrap;
+        background: #000;
+        color: #fff;
+        padding: 15px;
+        border-radius: 4px;
+        overflow-x: auto;
+        max-height: 600px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="analyzer-container">
+    <h4 class="mb-4">Java源码分析</h4>
+    
+    <div class="analyzer-form">
+        <form id="javaCodeAnalysisForm">
+            <div class="form-group">
+                <label for="targetService" class="form-label">目标服务</label>
+                <select id="targetService" class="form-select" required>
+                    <option value="">请选择目标服务</option>
+                    <option value="vv-education-service">vv-education-service</option>
+                    <option value="java-callgraph2">java-callgraph2</option>
+                    <option value="custom">自定义服务</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="baseCommit" class="form-label">Base Commit</label>
+                <input type="text" id="baseCommit" class="form-control" placeholder="请输入base commit哈希值" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="newCommit" class="form-label">New Commit</label>
+                <input type="text" id="newCommit" class="form-control" placeholder="请输入new commit哈希值" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="llmProvider" class="form-label">大模型提供商</label>
+                <select id="llmProvider" class="form-select">
+                    {% for key, provider in llm_providers.items %}
+                    <option value="{{ key }}" {% if key == llm_provider %}selected{% endif %}>
+                        {{ provider.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="model" class="form-label">模型</label>
+                <select id="model" class="form-select">
+                    <option value="deepseek-reasoner">deepseek-reasoner (推理模型)</option>
+                    <option value="deepseek-chat">deepseek-chat (对话模型)</option>
+                </select>
+            </div>
+            
+            <div class="submit-container">
+                <button type="submit" class="submit-button" id="analyzeBtn">开始分析</button>
+            </div>
+        </form>
+        
+        <div class="loading" id="loadingIndicator">
+            <div class="spinner"></div>
+            <p>正在分析Java源码变更，请稍候...</p>
+        </div>
+        
+        <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
+        
+        <div class="result-container" id="resultContainer">
+            <h5>分析结果</h5>
+            <div id="analysisResult" class="analysis-result"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/java_code_analyzer.js' %}"></script>
+{% endblock %}

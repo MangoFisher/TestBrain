@@ -2,8 +2,9 @@ from pathlib import Path
 import yaml
 import json
 from typing import Dict, Any, List
-from langchain.prompts import ChatPromptTemplate
-from langchain.prompts.chat import SystemMessagePromptTemplate, HumanMessagePromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from ..base_prompts import BasePromptManager
 
 
