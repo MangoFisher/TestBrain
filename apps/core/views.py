@@ -29,7 +29,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 import time
-from .milvus_helper import get_embedding_model, init_milvus_collection, process_singel_file
+from apps.knowledge.milvus_helper import get_embedding_model, init_milvus_collection, process_singel_file
 
 import hashlib
 import numpy as np
