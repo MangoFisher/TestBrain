@@ -17,7 +17,7 @@ from tools import GitTools
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from apps.ai_agents.agents.java_code_analyzer.java_code_analyzer_agent import JavaCodeAnalyzerAgent
+from apps.ai_agents.java_code_analyzer.java_code_analyzer_agent import JavaCodeAnalyzerAgent
 
 
 def main():

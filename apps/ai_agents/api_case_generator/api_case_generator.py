@@ -16,7 +16,7 @@ from apps.utils.progress_schema import TaskStatus
 from apps.utils.logger_manager import get_logger
 
 # 为本模块的日志统一附加 task_type，用于前端区分“生成类”任务
-_base_logger = get_logger('apps.agents.api_case_generator')
+_base_logger = get_logger('apps.api_case_generator')
 logger = logging.LoggerAdapter(_base_logger, {'task_type': 'generation'})
 
 class APITestCaseGeneratorAgent:

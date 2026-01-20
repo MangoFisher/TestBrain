@@ -6,13 +6,13 @@ import json
 
 from .models import TestCase, TestCaseReview, KnowledgeBase
 from .forms import TestCaseForm, TestCaseReviewForm, KnowledgeBaseForm
-from apps.ai_agents.agents.test_case_generator.generator import TestCaseGeneratorAgent
-from apps.ai_agents.agents.test_case_reviewer.reviewer import TestCaseReviewerAgent
-from apps.ai_agents.agents.prd_analyzer.analyser import PrdAnalyserAgent
-from apps.ai_agents.agents.api_case_generator.api_case_generator import APITestCaseGeneratorAgent, parse_api_definitions,generate_test_cases_for_apis
-from apps.ai_agents.agents.java_code_analyzer.java_code_analyzer_agent import JavaCodeAnalyzerAgent
-from apps.ai_agents.agents.java_code_analyzer.tools import GitTools
-from apps.ai_agents.agents.api_case_generator.prompts import APITestCaseGeneratorPrompt
+from apps.ai_agents.test_case_generator.generator import TestCaseGeneratorAgent
+from apps.ai_agents.test_case_reviewer.reviewer import TestCaseReviewerAgent
+from apps.ai_agents.prd_analyzer.analyser import PrdAnalyserAgent
+from apps.ai_agents.api_case_generator.api_case_generator import APITestCaseGeneratorAgent, parse_api_definitions,generate_test_cases_for_apis
+from apps.ai_agents.java_code_analyzer.java_code_analyzer_agent import JavaCodeAnalyzerAgent
+from apps.ai_agents.java_code_analyzer.tools import GitTools
+from apps.ai_agents.api_case_generator.prompts import APITestCaseGeneratorPrompt
 from apps.utils.progress_registry import get_progress as get_task_progress
 from ..knowledge.service import KnowledgeService
 

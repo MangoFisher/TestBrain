@@ -5,7 +5,7 @@ import os
 from typing import Dict, Any
 from pathlib import Path
 
-from apps.ai_agents.agents.base_prompts import BasePromptManager
+from apps.ai_agents.common.base_prompts import BasePromptManager
 
 
 class JavaCodeAnalyzerPromptManager(BasePromptManager):

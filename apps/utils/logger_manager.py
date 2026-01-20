@@ -131,7 +131,7 @@ class LogManager:
         self.loggers = {
             'core': self._get_logger('core'),
             'llm': self._get_logger('llm'),
-            'agents': self._get_logger('agents'),
+            'ai_agents': self._get_logger('ai_agents'),
             'knowledge': self._get_logger('knowledge'),
             'api': self._get_logger('api'),
         }
