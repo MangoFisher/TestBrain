@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('发送的数据:', requestData);
             
             // 发送请求
-            fetch('/generate/', {
+            fetch('/test_case_generator/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

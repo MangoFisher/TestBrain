@@ -100,13 +100,13 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if '/generate/' in request.path %}active{% endif %}" href="/generate/">
+                    <a class="nav-link {% if '/generate/' in request.path %}active{% endif %}" href="/test_case_generator/">
                         <i class="fas fa-plus-circle"></i>
                         测试用例生成
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if '/review/' in request.path %}active{% endif %}" href="/review/">
+                    <a class="nav-link {% if '/test_case_reviewer/' in request.path %}active{% endif %}" href="/test_case_reviewer/">
                         <i class="fas fa-check-circle"></i>
                         测试用例评审
                     </a>
@@ -124,7 +124,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if '/api_case_generate/' in request.path %}active{% endif %}" href="/api_case_generate/">
+                    <a class="nav-link {% if '/api_case_generator/' in request.path %}active{% endif %}" href="/api_case_generator/">
                         <i class="fas fa-code"></i>
                         接口case生成
                     </a>

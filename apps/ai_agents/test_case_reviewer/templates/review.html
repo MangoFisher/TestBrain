@@ -396,7 +396,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/review.js' %}"></script>
+<script src="{% static 'review.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // 全选功能
@@ -436,7 +436,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             try {
                 // 获取测试用例数据
-                const response = await fetch('/api/copy-test-cases/?ids=' + selectedIds.join(','), {
+                const response = await fetch('test_case_reviewer/api/copy-test-cases/?ids=' + selectedIds.join(','), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -525,7 +525,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // 导出选中的测试用例到Excel
-            window.location.href = '/api/export-test-cases-excel/?ids=' + selectedIds.join(',');
+            window.location.href = 'test_case_reviewer/api/export-test-cases-excel/?ids=' + selectedIds.join(',');
         });
     }
     
@@ -560,7 +560,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             try {
-                const response = await fetch('/api/copy-test-cases/?ids=' + ids.join(','), {
+                const response = await fetch('test_case_reviewer/api/copy-test-cases/?ids=' + ids.join(','), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -608,7 +608,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('请先选择要导出的测试用例');
                 return;
             }
-            window.location.href = '/api/export-test-cases-excel/?ids=' + ids.join(',');
+            window.location.href = 'test_case_reviewer/api/export-test-cases-excel/?ids=' + ids.join(',');
         });
     }
     // 未通过标签页的全选功能
@@ -648,7 +648,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             try {
-                const response = await fetch('/api/delete-test-cases/?ids=' + selectedIds.join(','), {
+                const response = await fetch('api/delete-test-cases/?ids=' + selectedIds.join(','), {
                     method: 'DELETE',
                     headers: {
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value

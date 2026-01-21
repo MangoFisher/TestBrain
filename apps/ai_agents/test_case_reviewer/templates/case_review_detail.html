@@ -135,7 +135,7 @@
         
         if (testCaseId) {
             // 获取测试用例数据
-            fetch(`/api/test-case/${testCaseId}/`, {
+            fetch(`api/test-case/${testCaseId}/`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -177,7 +177,7 @@
             aiReviewResult.value = '评审中...';
             button.disabled = true;  // 禁用按钮防止重复点击
             
-            fetch('/api/review/', {
+            fetch('api/review/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -228,7 +228,7 @@
                 expected_results: form.expected_results.value
             };
 
-            fetch('/api/update-test-case/', {
+            fetch('api/update-test-case/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

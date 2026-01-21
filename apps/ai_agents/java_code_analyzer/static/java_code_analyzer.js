@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showLoading();
             
             // 发送分析请求
-            const response = await fetch('/api/java-code-analyzer-service/', {
+            const response = await fetch('/java_code_analyzer/api/java-code-analyzer-service/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

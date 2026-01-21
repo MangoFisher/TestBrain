@@ -53,9 +53,13 @@ INSTALLED_APPS = [
     # 自定义应用
     'apps.core',
     'apps.llm',
-    # 'apps.agents',
-    'apps.ai_agents',
     'apps.knowledge',
+    'apps.ai_agents.api_case_generator.apps.ApiCaseGeneratorConfig',
+    'apps.ai_agents.java_code_analyzer.apps.JavaCodeAnalyzerConfig',
+    'apps.ai_agents.prd_analyzer.apps.PrdAnalyzerConfig',
+    'apps.ai_agents.test_case_generator.apps.TestCaseGeneratorConfig',
+    'apps.ai_agents.test_case_reviewer.apps.TestCaseReviewerConfig',
+
 ]
 
 MIDDLEWARE = [
@@ -121,7 +125,7 @@ LANGUAGE_CODE = 'zh-hans'
 USE_I18N = True
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]

@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // 直接打开新窗口，进入详细评审页面
-            window.open(`/case-review-detail/?id=${testCaseId}`, 'TestCaseReview', 
+            window.open(`/test_case_reviewer/case-review-detail/?id=${testCaseId}`, 'TestCaseReview', 
                 'width=800,height=600,scrollbars=yes,resizable=yes');
         });
     });
