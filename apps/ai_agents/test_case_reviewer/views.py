@@ -17,12 +17,6 @@ from apps.knowledge.service import KnowledgeService
 
 
 
-
-
-
-
-
-
 logger = get_logger(__name__)
 # 获取LLM配置
 llm_config = getattr(settings, 'LLM_PROVIDERS', {})

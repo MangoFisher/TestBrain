@@ -14,18 +14,6 @@ from apps.knowledge.embedding import BGEM3Embedder
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 logger = get_logger(__name__)
 # 获取LLM配置
 llm_config = getattr(settings, 'LLM_PROVIDERS', {})
