@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .prompts import APITestCaseGeneratorPrompt
 from apps.llm.base import LLMServiceFactory
-from .api_test_case_parser import parse_minimal_cases_or_raise
+from .iface_test_case_parser import parse_minimal_cases_or_raise
 from .retry_utils import generate_with_retry
 from apps.utils.logger_manager import set_task_context, clear_task_context
 
@@ -16,7 +16,7 @@ from apps.utils.progress_schema import TaskStatus
 from apps.utils.logger_manager import get_logger
 
 # 为本模块的日志统一附加 task_type，用于前端区分“生成类”任务
-_base_logger = get_logger('apps.api_case_generator')
+_base_logger = get_logger('apps.iface_case_generator')
 logger = logging.LoggerAdapter(_base_logger, {'task_type': 'generation'})
 
 class APITestCaseGeneratorAgent:
@@ -74,7 +74,7 @@ class APITestCaseGeneratorAgent:
         template_path = os.path.join(
             os.path.dirname(__file__),
             'templates',
-            'api_test_case_template.jsonc'
+            'iface_test_case_template.jsonc'
         )
         # 优先使用 json5 以支持模板中的注释；若不可用则回退到标准 json
         try:

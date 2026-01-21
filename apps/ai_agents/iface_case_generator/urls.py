@@ -1,11 +1,11 @@
 from django.urls import path
 from . import views
 
-app_name = 'api_case_generator'
+app_name = 'iface_case_generator'
 
 urlpatterns = [
     # 页面路由
-    path('', views.api_case_generate, name='api_case_generate'),
+    path('', views.iface_case_generator, name='iface_case_generator'),
 
     
     # API 路由

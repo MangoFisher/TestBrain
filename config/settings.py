@@ -54,7 +54,7 @@ INSTALLED_APPS = [
     'apps.core',
     'apps.llm',
     'apps.knowledge',
-    'apps.ai_agents.api_case_generator.apps.ApiCaseGeneratorConfig',
+    'apps.ai_agents.iface_case_generator.apps.IfaceCaseGeneratorConfig',
     'apps.ai_agents.java_code_analyzer.apps.JavaCodeAnalyzerConfig',
     'apps.ai_agents.prd_analyzer.apps.PrdAnalyzerConfig',
     'apps.ai_agents.test_case_generator.apps.TestCaseGeneratorConfig',

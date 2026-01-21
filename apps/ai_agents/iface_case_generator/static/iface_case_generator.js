@@ -121,8 +121,8 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const formData = new FormData(form);
             
-            // 发送POST请求到api_case_generate路由
-            const response = await fetch('/api_case_generator/', {
+            // 发送POST请求到iface_case_generator路由
+            const response = await fetch('/iface_case_generator/', {
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.uploadedFilePath = response.file_path;
 
             // 初始化规则编辑区：从后端拉取模版规则
-            fetch('/api_case_generator/api/testcase-rule-template/')
+            fetch('/iface_case_generator/api/testcase-rule-template/')
                 .then(r => r.json())
                 .then(data => {
                     if (data && data.success) {
@@ -500,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 formData.append('rules_override', rulesOverride);
             }
             
-            const response = await fetch('/api_case_generator/', {
+            const response = await fetch('/iface_case_generator/', {
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -536,7 +536,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 轮询获取进度
     async function pollProgress(taskId) {
         try {
-            const resp = await fetch(`/api_case_generator/api/get-generation-progress/?task_id=${encodeURIComponent(taskId)}`);
+            const resp = await fetch(`/iface_case_generator/api/get-generation-progress/?task_id=${encodeURIComponent(taskId)}`);
             const data = await resp.json();
             if (!data.success) return;
             updateProgressUI(data.progress);
@@ -640,7 +640,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('live-logs').style.display = 'block';
             document.getElementById('result-message').textContent = progress.message || 'API测试用例生成完成';
             if (progress.file_path) {
-                document.getElementById('download-link').href = `/api_case_generator/download_file/?file_path=${encodeURIComponent(progress.file_path)}`;
+                document.getElementById('download-link').href = `/iface_case_generator/download_file/?file_path=${encodeURIComponent(progress.file_path)}`;
                 document.getElementById('download-link').classList.remove('disabled');
             }
             // 完成后清理 SSE 与轮询
@@ -683,6 +683,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('generation-result').style.display = 'block';
         
         document.getElementById('result-message').textContent = result.message;
-        document.getElementById('download-link').href = `/api_case_generator/download_file/?file_path=${encodeURIComponent(result.file_path)}`;
+        document.getElementById('download-link').href = `/iface_case_generator/download_file/?file_path=${encodeURIComponent(result.file_path)}`;
     }
 });

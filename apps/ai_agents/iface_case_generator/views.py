@@ -1,4 +1,4 @@
-from apps.ai_agents.api_case_generator.api_case_generator import parse_api_definitions,generate_test_cases_for_apis
+from apps.ai_agents.iface_case_generator.iface_case_generator import parse_api_definitions,generate_test_cases_for_apis
 
 from django.conf import settings
 from django.http import JsonResponse, FileResponse
@@ -29,11 +29,11 @@ DEFAULT_PROVIDER = llm_config.get('default_provider', 'deepseek')
 PROVIDERS = {k: v for k, v in llm_config.items() if k != 'default_provider'}
 
 
-def api_case_generate(request):
+def iface_case_generator(request):
     """
     页面-接口case生成页面视图函数
     """
-    logger.info("===== 进入api_case_generate视图函数 =====")
+    logger.info("===== 进入iface_case_generator视图函数 =====")
     logger.info(f"请求方法: {request.method}")
     
     if request.method == 'GET':
@@ -41,7 +41,7 @@ def api_case_generate(request):
             'llm_providers': PROVIDERS,
             'llm_provider': DEFAULT_PROVIDER,
         }
-        return render(request, 'api_case_generate.html', context)
+        return render(request, 'iface_case_generator.html', context)
     elif request.method == 'POST':
         if 'single_file' in request.FILES:
             uploaded_file = request.FILES['single_file']
