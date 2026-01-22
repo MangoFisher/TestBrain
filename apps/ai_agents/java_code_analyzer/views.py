@@ -67,12 +67,7 @@ def java_code_analyzer_service_api(request):
             **PROVIDERS.get(llm_provider, {})
         )
         
-        # 确定仓库路径（可以根据服务名称映射到实际路径）
-        # 这里可以根据实际情况调整仓库路径的确定逻辑
-        repo_path_mapping = {
-            'vv-education-service': '/Users/zhangxiaoguo/Documents/vv-education-service',
-            'java-callgraph2': '/Users/zhangxiaoguo/Documents/java-callgraph2',
-        }
+        repo_path_mapping = settings.REPO_PATH_MAPPING
         
         repo_path = repo_path_mapping.get(target_service, target_service)
         
