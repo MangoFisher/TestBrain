@@ -18,9 +18,57 @@ class TestCaseGeneratorAgent:
         self.prompt = TestCaseGeneratorPrompt()
         self.logger = get_logger(self.__class__.__name__)  # 添加logger
     
+
+    async def async_generate(self, input_text: str, input_type: str = "requirement") -> List[Dict[str, Any]]:
+        """异步方式生成测试用例"""
+        self.logger.info(f"开始生成测试用例-异步方式,进入生成测试用例的TestCaseGeneratorAgent")
+        # 确定输入类型描述
+        input_type_desc = "需求描述" if input_type == "requirement" else "代码片段"
+        
+        # 获取知识上下文
+        knowledge_context = self._get_knowledge_context(input_text)
+        self.logger.info(f"获取到知识库上下文: \n{'='*50}\n{knowledge_context}\n{'='*50}")
+        
+        # 处理设计方法和测试类型
+        case_design_methods = ",".join(self.case_design_methods) if self.case_design_methods else ""
+        case_categories = ",".join(self.case_categories) if self.case_categories else ""
+        
+        # 使用新的 format_messages 方法获取消息列表
+        messages = self.prompt.format_messages(
+            requirements=input_text,
+            case_design_methods=case_design_methods,
+            case_categories=case_categories,
+            case_count=self.case_count,
+            knowledge_context=knowledge_context
+        )
+        self.logger.info(f"构建后大模型提示词+用户需求消息: \n{'='*50}\n{messages}\n{'='*50}")
+        
+        # 调用LLM服务
+        try:
+            response = await self.llm_service.ainvoke(messages)
+            result = response.content
+            self.logger.info(f"LLM原始响应: \n{'='*50}\n{result}\n{'='*50}")
+            
+            # 尝试提取JSON部分
+            json_str = self._extract_json_from_response(result)
+            if not json_str:
+                raise ValueError("无法从响应中提取有效的JSON数据")
+                
+            # 尝试解析JSON
+            test_cases = json.loads(json_str)
+            self.logger.info(f"_validate_test_cases处理前的用例个数: {len(test_cases)}")
+            
+            valid_test_cases = self._validate_test_cases(test_cases)
+            return valid_test_cases
+            
+        except Exception as e:
+            raise ValueError(f"无法解析生成的测试用例: {str(e)}\n原始响应: {result}")
+
+
+    
     def generate(self, input_text: str, input_type: str = "requirement") -> List[Dict[str, Any]]:
-        """生成测试用例"""
-        self.logger.info(f"开始生成测试用例,进入生成测试用例的TestCaseGeneratorAgent")
+        """同步方式生成测试用例"""
+        self.logger.info(f"开始生成测试用例-同步方式,进入生成测试用例的TestCaseGeneratorAgent")
         # 确定输入类型描述
         input_type_desc = "需求描述" if input_type == "requirement" else "代码片段"
         
