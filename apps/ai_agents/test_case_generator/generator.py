@@ -59,6 +59,9 @@ class TestCaseGeneratorAgent:
             self.logger.info(f"_validate_test_cases处理前的用例个数: {len(test_cases)}")
             
             valid_test_cases = self._validate_test_cases(test_cases)
+            if len(valid_test_cases) > self.case_count:
+                self.logger.warning(f"LLM 超量生成：期望 {self.case_count} 条，但拿到 {len(valid_test_cases)} 条，自动裁剪。")
+                valid_test_cases = valid_test_cases[: self.case_count]
             return valid_test_cases
             
         except Exception as e:
