@@ -306,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveButton.textContent = '保存中...';
                 
                 // 发送保存请求
-                fetch('/core/save-test-case/', {
+                fetch('/test_case_generator/save-test-case/', {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': getCookie('csrftoken'),

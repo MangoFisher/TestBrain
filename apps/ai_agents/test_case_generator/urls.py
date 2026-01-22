@@ -9,6 +9,7 @@ urlpatterns = [
 
     
     # API 路由
+    path('save-test-case/', views.save_test_case, name='save_test_case'),
 
 
 ]

@@ -178,7 +178,7 @@ function initGeneratePage() {
             const inputType = document.querySelector('input[name="input_type"]:checked').value;
             const inputText = document.getElementById('input-text').value;
             
-            fetch('/api/save-test-case/', {
+            fetch('/test_case_generator-drop/save-test-case/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
