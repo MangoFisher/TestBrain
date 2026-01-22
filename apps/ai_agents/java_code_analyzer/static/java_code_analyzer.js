@@ -6,15 +6,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingIndicator = document.getElementById('loadingIndicator');
     const errorMessage = document.getElementById('errorMessage');
     const successMessage = document.getElementById('successMessage');
-    const resultContainer = document.getElementById('resultContainer');
-    const analysisResult = document.getElementById('analysisResult');
     
     // 隐藏所有状态信息
     function hideAllMessages() {
         loadingIndicator.style.display = 'none';
         errorMessage.style.display = 'none';
         successMessage.style.display = 'none';
-        resultContainer.style.display = 'none';
     }
     
     // 显示加载状态
@@ -30,18 +27,31 @@ document.addEventListener('DOMContentLoaded', function() {
         errorMessage.style.display = 'block';
     }
     
-    // 显示成功信息
-    function showSuccess(message) {
-        hideAllMessages();
-        successMessage.textContent = message;
-        successMessage.style.display = 'block';
+    function clearSuccessMessage() {
+        while (successMessage.firstChild) {
+            successMessage.removeChild(successMessage.firstChild);
+        }
     }
-    
-    // 显示分析结果
-    function showResult(result) {
-        hideAllMessages();
-        analysisResult.textContent = result;
-        resultContainer.style.display = 'block';
+
+    function showSuccessWithDownload(message, downloadUrl, filename) {
+        // 只隐藏 loading / error，不隐藏 resultContainer
+        loadingIndicator.style.display = 'none';
+        errorMessage.style.display = 'none';
+
+        clearSuccessMessage();
+        successMessage.appendChild(document.createTextNode(message));
+
+        if (downloadUrl && filename) {
+            successMessage.appendChild(document.createElement('br'));
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.textContent = filename;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            successMessage.appendChild(link);
+        }
+
+        successMessage.style.display = 'block';
     }
     
     // 表单提交事件处理
@@ -86,8 +96,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
                 
                 if (data.success) {
-                    showResult(data.result || '分析完成');
-                    showSuccess('Java源码分析成功完成');
+                    // 成功：显示成功提示 + 下载链接
+                    loadingIndicator.style.display = 'none';
+                    errorMessage.style.display = 'none';
+
+                    showSuccessWithDownload(
+                        'Java源码分析报告已成功生成，可点击下面链接下载',
+                        data.report_download_url,
+                        data.report_filename
+                    );
                 } else {
                     showError(data.error || '分析失败');
                 }

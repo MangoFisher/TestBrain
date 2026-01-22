@@ -9,6 +9,8 @@ from pathlib import Path
 from datetime import datetime
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import render
+from django.http import FileResponse, Http404
+from urllib.parse import quote
 
 
 
@@ -39,6 +41,33 @@ def java_code_analyzer(request):
             'llm_provider': DEFAULT_PROVIDER,
         }
         return render(request, 'java_code_analyzer.html', context)
+
+
+@require_http_methods(["GET"])
+def download_report(request):
+    """下载java源码分析报告"""
+    filename = request.GET.get('filename', '')
+    if not filename:
+        raise Http404("缺少文件名")
+
+    # 只允许下载 outputs 目录下的 .md 文件，避免路径穿越
+    if '/' in filename or '\\' in filename:
+        raise Http404("非法文件名")
+    if not filename.endswith('.md'):
+        raise Http404("仅支持下载 .md 文件")
+
+    outputs_dir = (Path(settings.BASE_DIR) / 'outputs').resolve()
+    file_path = (outputs_dir / filename).resolve()
+    if outputs_dir not in file_path.parents:
+        raise Http404("非法文件路径")
+    if not file_path.exists() or not file_path.is_file():
+        raise Http404("文件不存在")
+
+    response = FileResponse(open(file_path, 'rb'), as_attachment=True, filename=filename)
+    response['Content-Type'] = 'text/markdown; charset=utf-8'
+    response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 @require_http_methods(["POST"])
@@ -114,7 +143,9 @@ def java_code_analyzer_service_api(request):
                 return JsonResponse({
                     'success': True,
                     'result': report_content or '分析完成，但没有返回详细结果',
-                    'report_path': str(output_path)
+                    'report_path': str(output_path),
+                    'report_filename': output_filename,
+                    'report_download_url': f"/java_code_analyzer/api/download-report/?filename={quote(output_filename)}"
                 })
 
             error_msg = result.get('error', '分析失败')
