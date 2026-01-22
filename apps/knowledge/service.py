@@ -1,15 +1,18 @@
-from .vector_store import MilvusVectorStore
-from .embedding import BGEM3Embedder
+# from .vector_store import MilvusVectorStore
+# from .embedding import BGEM3Embedder
 from ..core.models import KnowledgeBase
 # from typing import List, Dict, Any
 from apps.utils.logger_manager import get_logger
+from django.apps import apps
+
 
 class KnowledgeService:
     """知识库服务，整合向量存储和嵌入模型"""
     
-    def __init__(self, vector_store: MilvusVectorStore, embedder: BGEM3Embedder):
-        self.vector_store = vector_store
-        self.embedder = embedder
+    def __init__(self):
+        config = apps.get_app_config('knowledge')
+        self.vector_store = config.vector_store
+        self.embedder = config.embedder
         self.logger = get_logger(self.__class__.__name__)
         
     def add_knowledge(self, title: str, content: str) -> int:
@@ -91,4 +94,9 @@ class KnowledgeService:
         
         return combined_content
 
-   
+
+def get_knowledgeService_instance():
+    """获取知识库服务实例"""
+    config = apps.get_app_config("knowledge")
+    return KnowledgeService()
+    # return config.vector_store, config.embedder

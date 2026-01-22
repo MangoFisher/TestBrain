@@ -4,13 +4,13 @@ from django.views.decorators.http import require_http_methods
 import json
 
 from .models import TestCase, KnowledgeBase
-from ..knowledge.service import KnowledgeService
+from ..knowledge.service import get_knowledgeService_instance
 
 # 初始化服务
 from django.conf import settings
 from apps.llm import LLMServiceFactory
-from ..knowledge.vector_store import MilvusVectorStore
-from ..knowledge.embedding import BGEM3Embedder
+# from ..knowledge.vector_store import MilvusVectorStore
+# from ..knowledge.embedding import BGEM3Embedder
 from apps.utils.logger_manager import get_logger
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -42,17 +42,8 @@ llm_service = LLMServiceFactory.create(
     **DEFAULT_LLM_CONFIG
 )
 
-vector_store = MilvusVectorStore(
-    host=settings.VECTOR_DB_CONFIG['host'],
-    port=settings.VECTOR_DB_CONFIG['port'],
-    collection_name=settings.VECTOR_DB_CONFIG['collection_name']
-)
+knowledge_service = get_knowledgeService_instance()
 
-embedder = BGEM3Embedder(
-    model_name="BAAI/bge-m3"
-)
-
-knowledge_service = KnowledgeService(vector_store, embedder)
 # test_case_generator = TestCaseGeneratorAgent(llm_service, knowledge_service)
 #test_case_reviewer = TestCaseReviewerAgent(llm_service, knowledge_service)
 

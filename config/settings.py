@@ -53,7 +53,8 @@ INSTALLED_APPS = [
     # 自定义应用
     'apps.core',
     'apps.llm',
-    'apps.knowledge',
+    # 'apps.knowledge',
+    'apps.knowledge.apps.KnowledgeConfig',
     'apps.ai_agents.iface_case_generator.apps.IfaceCaseGeneratorConfig',
     'apps.ai_agents.java_code_analyzer.apps.JavaCodeAnalyzerConfig',
     'apps.ai_agents.prd_analyzer.apps.PrdAnalyzerConfig',

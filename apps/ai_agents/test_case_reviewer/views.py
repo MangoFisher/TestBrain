@@ -11,9 +11,7 @@ from datetime import datetime
 from django.http import HttpResponse
 from django.conf import settings
 from apps.llm import LLMServiceFactory
-from apps.knowledge.vector_store import MilvusVectorStore
-from apps.knowledge.embedding import BGEM3Embedder
-from apps.knowledge.service import KnowledgeService
+from apps.knowledge.service import get_knowledgeService_instance
 
 
 
@@ -36,17 +34,8 @@ llm_service = LLMServiceFactory.create(
     **DEFAULT_LLM_CONFIG
 )
 
-vector_store = MilvusVectorStore(
-    host=settings.VECTOR_DB_CONFIG['host'],
-    port=settings.VECTOR_DB_CONFIG['port'],
-    collection_name=settings.VECTOR_DB_CONFIG['collection_name']
-)
+knowledge_service = get_knowledgeService_instance()
 
-embedder = BGEM3Embedder(
-    model_name="BAAI/bge-m3"
-)
-
-knowledge_service = KnowledgeService(vector_store, embedder)
 
 
 # @login_required 先屏蔽登录

@@ -8,9 +8,7 @@ from apps.utils.logger_manager import get_logger
 from django.conf import settings
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import render
-from apps.knowledge.service import KnowledgeService
-from apps.knowledge.vector_store import MilvusVectorStore
-from apps.knowledge.embedding import BGEM3Embedder
+from apps.knowledge.service import get_knowledgeService_instance
 
 
 
@@ -24,17 +22,8 @@ DEFAULT_PROVIDER = llm_config.get('default_provider', 'deepseek')
 # 创建提供商字典，排除'default_provider'键
 PROVIDERS = {k: v for k, v in llm_config.items() if k != 'default_provider'}
 
-vector_store = MilvusVectorStore(
-    host=settings.VECTOR_DB_CONFIG['host'],
-    port=settings.VECTOR_DB_CONFIG['port'],
-    collection_name=settings.VECTOR_DB_CONFIG['collection_name']
-)
 
-embedder = BGEM3Embedder(
-    model_name="BAAI/bge-m3"
-)
-
-knowledge_service = KnowledgeService(vector_store, embedder)
+knowledge_service = get_knowledgeService_instance()
 
 
 
