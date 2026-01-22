@@ -1,8 +1,8 @@
 """
 Java代码分析AI Agent的提示词管理器。
 """
-import os
-from typing import Dict, Any
+# import os
+# from typing import Dict, Any
 from pathlib import Path
 
 from apps.ai_agents.common.base_prompts import BasePromptManager

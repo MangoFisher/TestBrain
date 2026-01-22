@@ -1,6 +1,6 @@
 import torch
 from typing import List, Union, Dict
-from transformers import AutoTokenizer, AutoModel
+# from transformers import AutoTokenizer, AutoModel
 from sentence_transformers import SentenceTransformer
 
 import numpy as np

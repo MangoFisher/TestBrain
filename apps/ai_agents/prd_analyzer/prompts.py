@@ -2,7 +2,7 @@ from pathlib import Path
 import yaml
 from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import SystemMessage, HumanMessage
+# from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from apps.ai_agents.common.base_prompts import BasePromptManager
 

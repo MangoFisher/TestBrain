@@ -6,7 +6,7 @@ from apps.llm.base import BaseLLMService
 from apps.knowledge.service import KnowledgeService
 from apps.core.models import TestCase
 from .prompts import TestCaseReviewerPrompt
-from langchain_core.messages import SystemMessage, HumanMessage
+# from langchain_core.messages import SystemMessage, HumanMessage
 from apps.utils.logger_manager import get_logger
 
 

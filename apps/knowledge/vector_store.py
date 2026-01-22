@@ -1,9 +1,9 @@
 from pymilvus import connections, Collection, utility, DataType
 from pymilvus import CollectionSchema, FieldSchema
-import numpy as np
+# import numpy as np
 from typing import List, Dict, Any, Optional
-import os
-from django.conf import settings
+# import os
+# from django.conf import settings
 from apps.utils.logger_manager import get_logger
 
 logger = get_logger(__name__)

@@ -1,7 +1,7 @@
 from .vector_store import MilvusVectorStore
 from .embedding import BGEM3Embedder
 from ..core.models import KnowledgeBase
-from typing import List, Dict, Any
+# from typing import List, Dict, Any
 from apps.utils.logger_manager import get_logger
 
 class KnowledgeService:

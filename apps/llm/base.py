@@ -9,8 +9,8 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from .callbacks import LoggingCallbackHandler
-from .deepseek import DeepSeekChatModel
-from .qwen import QwenChatModel
+# from .deepseek import DeepSeekChatModel
+# from .qwen import QwenChatModel
 
 
 # 加载.env文件中的环境变量

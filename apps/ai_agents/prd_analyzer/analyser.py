@@ -1,11 +1,11 @@
 from typing import Dict, Any, List, Optional
 import json
-import logging
+# import logging
 
 from apps.llm.base import BaseLLMService
 from apps.knowledge.service import KnowledgeService
 from .prompts import PrdAnalyserPrompt
-from langchain_core.messages import SystemMessage, HumanMessage
+# from langchain_core.messages import SystemMessage, HumanMessage
 from apps.utils.logger_manager import get_logger
 
 class PrdAnalyserAgent:

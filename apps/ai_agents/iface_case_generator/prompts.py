@@ -3,7 +3,7 @@ import yaml
 import json
 from typing import Dict, Any, List
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import SystemMessage, HumanMessage
+# from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from apps.ai_agents.common.base_prompts import BasePromptManager
 
