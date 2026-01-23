@@ -12,19 +12,14 @@ from django.http import HttpResponse
 from django.conf import settings
 from apps.llm import LLMServiceFactory
 from apps.knowledge.service import get_knowledgeService_instance
+from apps.llm.utils import get_agent_llm_configs
+
 
 
 
 logger = get_logger(__name__)
-# 获取LLM配置
-llm_config = getattr(settings, 'LLM_PROVIDERS', {})
 
-# 获取默认提供商
-DEFAULT_PROVIDER = llm_config.get('default_provider', 'deepseek')
-
-# 创建提供商字典，排除'default_provider'键
-PROVIDERS = {k: v for k, v in llm_config.items() if k != 'default_provider'}
-
+DEFAULT_PROVIDER, PROVIDERS = get_agent_llm_configs("test_case_reviewer")
 # 获取默认提供商的配置
 DEFAULT_LLM_CONFIG = PROVIDERS.get(DEFAULT_PROVIDER, {})
 

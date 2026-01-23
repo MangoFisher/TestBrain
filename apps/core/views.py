@@ -174,7 +174,7 @@ def search_knowledge(request):
             })
         
         # 搜索知识库
-        query_embedding = embedder.get_embeddings(query)[0]
+        query_embedding = knowledge_service.embedder.get_embeddings(query)[0]
         logger.info(f"查询文本: '{query}', 向量维度: {len(query_embedding)}, 前5个维度: {query_embedding[:5]}")
         results = knowledge_service.search_knowledge(query)
         
@@ -283,7 +283,7 @@ def upload_single_file(request):
 
                 try:
                     # 直接为所有文本内容生成向量
-                    all_embeddings = embedder.get_embeddings(texts=text_contents, show_progress_bar=False)
+                    all_embeddings = knowledge_service.embedder.get_embeddings(texts=text_contents, show_progress_bar=False)
                     logger.info(f"成功生成 {len(all_embeddings)} 个向量")
                     
                     # 确保embeddings是列表格式
@@ -309,7 +309,7 @@ def upload_single_file(request):
                     
                     # 插入数据到Milvus
                     logger.info(f"开始往milvus中插入 {len(data_to_insert)} 条数据")
-                    vector_store.add_data(data_to_insert)
+                    knowledge_service.vector_store.add_data(data_to_insert)
                     logger.info("数据插入完成")
                     
                     total_time = (datetime.now() - start_time).total_seconds()
