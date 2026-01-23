@@ -153,16 +153,15 @@ LLM_PROVIDERS = {
         'temperature': 1.0,
         'max_tokens': 8192,
     },
-    'openai': {
-        'name': 'OpenAI',
-        'model': 'gpt-3.5-turbo',
-        'temperature': 0.7,
-        'max_tokens': 200000,
-    }
 }
-
-# # 默认大模型提供商
-# DEFAULT_LLM_PROVIDER = 'deepseek'
+# AI Agent LLM提供商配置, 每个AI Agent可定制LLM提供商
+AGENT_LLM_DEFAULTS = {
+    "test_case_generator":  {"provider": "deepseek"},
+    "test_case_reviewer":   {"provider": "deepseek"},
+    "prd_analyzer":         {"provider": "deepseek"},
+    "java_code_analyzer":   {"provider": "deepseek"},
+    "iface_case_generator": {"provider": "deepseek"},
+}
 
 # 向量数据库配置
 VECTOR_DB_CONFIG = {

@@ -6,6 +6,7 @@ from django.conf import settings
 from apps.llm import LLMServiceFactory
 from django.shortcuts import render
 from apps.utils.file_transfer import word_to_markdown
+from apps.llm.utils import get_agent_llm_configs
 
 
 
@@ -14,11 +15,7 @@ from apps.utils.file_transfer import word_to_markdown
 # 获取LLM配置
 llm_config = getattr(settings, 'LLM_PROVIDERS', {})
 
-# 获取默认提供商
-DEFAULT_PROVIDER = llm_config.get('default_provider', 'deepseek')
-
-# 创建提供商字典，排除'default_provider'键
-PROVIDERS = {k: v for k, v in llm_config.items() if k != 'default_provider'}
+DEFAULT_PROVIDER, PROVIDERS = get_agent_llm_configs("prd_analyzer")
 
 # 获取默认提供商的配置
 DEFAULT_LLM_CONFIG = PROVIDERS.get(DEFAULT_PROVIDER, {})

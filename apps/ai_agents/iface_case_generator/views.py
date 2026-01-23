@@ -6,6 +6,7 @@ from apps.utils.progress_registry import get_progress as get_task_progress
 from apps.utils.logger_manager import get_logger, set_task_context, clear_task_context
 from django.shortcuts import render
 # from apps.ai_agents.common.base_prompts import PromptTemplateManager
+from apps.llm.utils import get_agent_llm_configs
 
 import json
 import os
@@ -13,20 +14,13 @@ import time
 from pathlib import Path
 import yaml
 
-# ... (rest of the code remains the same)
-
 
 
 logger = get_logger(__name__)
 
 # 获取LLM配置
 llm_config = getattr(settings, 'LLM_PROVIDERS', {})
-
-# 获取默认提供商
-DEFAULT_PROVIDER = llm_config.get('default_provider', 'deepseek')
-
-# 创建提供商字典，排除'default_provider'键
-PROVIDERS = {k: v for k, v in llm_config.items() if k != 'default_provider'}
+DEFAULT_PROVIDER, PROVIDERS = get_agent_llm_configs("iface_case_generator")
 
 
 def iface_case_generator(request):
