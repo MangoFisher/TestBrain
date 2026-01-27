@@ -137,11 +137,10 @@ class KnowledgeConfig(AppConfig):
    ```
 
 5. **启动java源码分析服务**
+   仓库地址:https://github.com/MangoFisher/java-analyzer.git
    ```bash
    mvn spring-boot:run -Dspring-boot.run.profiles=dev
    ```
-  #TODO: 仓库地址待提供
-
 
 6. **访问页面**
    - Web 控制台：http://127.0.0.1:8000/
