@@ -60,7 +60,7 @@ humanfriendly==10.0
 idna==3.10
 immutables==0.21
 Jinja2==3.1.6
-jiter==0.8.2
+jiter==0.12.0
 jmespath==1.0.1
 joblib==1.4.2
 json5==0.12.1
@@ -68,11 +68,11 @@ jsonpatch==1.33
 jsonpointer==3.0.0
 kiwisolver==1.4.8
 kombu==5.5.1
-langchain==0.3.19
+langchain==1.2.6
 langchain-community==0.3.18
 langchain-core==1.2.7
 langchain-deepseek==0.1.4
-langchain-openai==0.3.31
+langchain-openai==1.1.7
 langchain-text-splitters==0.3.6
 langdetect==1.0.9
 langgraph==1.0.6
@@ -100,7 +100,7 @@ olefile==0.47
 omegaconf==2.3.0
 onnx==1.17.0
 onnxruntime==1.21.0
-openai==1.101.0
+openai==2.15.0
 opencv-python==4.11.0.86
 openpyxl==3.1.5
 orjson==3.10.15
