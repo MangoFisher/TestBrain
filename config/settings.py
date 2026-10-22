@@ -6,16 +6,23 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# 加载项目根目录下的 .env（文件不存在时静默跳过）。
+# 必须放在读取任何环境变量之前，否则下方的数据库、Milvus、模型 Key
+# 等配置会读不到 .env 中填写的值。
+load_dotenv(BASE_DIR / ".env")
 
 # 配置 Hugging Face 国内镜像，用于 SentenceTransformer 模型下载
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+# 如需换源，在 .env 中设置 HF_ENDPOINT 覆盖即可
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
 # 采用北京时间
 TIME_ZONE = 'Asia/Shanghai'
 USE_TZ = False
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 确保项目根目录在Python路径中
 if str(BASE_DIR) not in sys.path:
@@ -31,8 +38,10 @@ ALLOWED_HOSTS = [
     '*'
 ]
 
-# 是否启用Milvus
-ENABLE_MILVUS = False
+# 是否启用Milvus向量库与向量模型。
+# 默认关闭，使项目在没有 Milvus / 嵌入模型 Key 的机器上也能正常启动；
+# 需要知识库检索功能时，在 .env 中设置 ENABLE_MILVUS=true 并配置 MILVUS_* 与 QWEN_API_KEY。
+ENABLE_MILVUS = os.getenv("ENABLE_MILVUS", "false").strip().lower() in ("1", "true", "yes", "on")
 
 # 添加上传测试用例文件目录配置
 MEDIA_ROOT = os.path.join(BASE_DIR, 'uploads')
@@ -94,22 +103,20 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
+# 数据库连接信息全部来自环境变量（见项目根目录 .env.example）。
+# 首次运行前需先创建好数据库，例如：
+#   CREATE DATABASE test_brain_db DEFAULT CHARACTER SET utf8mb4;
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'test_brain_db',
-        #----本地开发环境数据库配置----
-        # 'USER': 'root',
-        # 'PASSWORD': 'test123456',
-        # 'HOST': 'localhost',
-        #----本地开发环境数据库配置----
-
-        #----bj-uat环境数据库配置----
-        'USER': '',
-        'PASSWORD': '',
-        'HOST': '',
-        #----bj-uat环境数据库配置----
-        'PORT': '3306',
+        'NAME': os.getenv('MYSQL_DB', 'test_brain_db'),
+        'USER': os.getenv('MYSQL_USER', 'root'),
+        'PASSWORD': os.getenv('MYSQL_PASSWORD', ''),
+        'HOST': os.getenv('MYSQL_HOST', '127.0.0.1'),
+        'PORT': os.getenv('MYSQL_PORT', '3306'),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+        },
     }
 }
 
@@ -175,18 +182,17 @@ AGENT_LLM_DEFAULTS = {
     "iface_case_generator": {"provider": "deepseek"},
 }
 
-# 向量数据库配置
+# 向量数据库配置（来自环境变量，默认指向本机 Milvus）
 VECTOR_DB_CONFIG = {
-    'host': '172.16.50.57', # 
-    'port': '19530',
-    'db_name': 'qa_knowledge',
-    'collection_name': 'vv_knowledge_collection',
+    'host': os.getenv('MILVUS_HOST', '127.0.0.1'),
+    'port': os.getenv('MILVUS_PORT', '19530'),
+    'db_name': os.getenv('MILVUS_DB', 'default'),
+    'collection_name': os.getenv('MILVUS_COLLECTION', 'vv_knowledge_collection'),
 }
 
-# java源码分析服务调用地址
-# JAVA_ANALYZER_SERVICE_URL = "http://localhost:8089" #调用本地服务
-JAVA_ANALYZER_SERVICE_URL = "http://java-analyzer:80" #bj-uat服务间调用
-# JAVA_ANALYZER_SERVICE_URL = "http://172.20.214.59:8089" #本地开发调用bj-uat服务,服务每次部署ip会变
+# java源码分析服务调用地址（独立部署的外部服务，默认指向本机）
+# 该服务不在本仓库内，详见 README「可选依赖」章节
+JAVA_ANALYZER_SERVICE_URL = os.getenv('JAVA_ANALYZER_SERVICE_URL', 'http://127.0.0.1:8089')
 
 # Java 项目配置
 JAVA_PROJECTS_BASE_DIR = "../"  # Java 项目基础目录

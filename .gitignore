@@ -1,1 +1,22 @@
 .claude
+
+# 环境变量与密钥，禁止提交
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Django 运行时产物
+uploads/
+*.log
+
+# Milvus 本地数据（standalone_embed.sh 会生成）
+volumes/
+embedEtcd.yaml
+user.yaml
+
+# 系统文件
+.DS_Store

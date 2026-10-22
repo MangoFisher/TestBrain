@@ -20,16 +20,13 @@ class MilvusVectorStore:
         self.port = port or config.get("port", "19530")
         self.db_name = db_name or config.get("db_name", "default")
         self.collection_name = collection_name or config.get("collection_name", "vv_knowledge_collection")
-        # 原来的逻辑
-        self._connect()
-        self._ensure_collection()
-
-        # 从Django配置文件中读取ENABLE_MILVUS设置
-        # if getattr(settings, 'ENABLE_MILVUS', False):
-        #     self._connect()
-        #     self._ensure_collection()
-        # else:
-        #     print("Milvus connection disabled in settings")
+        # 仅在开启 Milvus 时建立连接；关闭时仍可构造对象，
+        # 以免在未部署 Milvus 的环境中启动即失败。
+        if getattr(settings, "ENABLE_MILVUS", False):
+            self._connect()
+            self._ensure_collection()
+        else:
+            logger.info("ENABLE_MILVUS 未开启，跳过 Milvus 连接与集合检查")
         
     def _connect(self):
         """连接到Milvus服务器"""

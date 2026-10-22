@@ -36,11 +36,17 @@ PROVIDERS = {k: v for k, v in llm_config.items() if k != 'default_provider'}
 # 获取默认提供商的配置
 DEFAULT_LLM_CONFIG = PROVIDERS.get(DEFAULT_PROVIDER, {})
 
-# 创建LLM服务实例
-llm_service = LLMServiceFactory.create(
-    provider=DEFAULT_PROVIDER,
-    # **DEFAULT_LLM_CONFIG
-)
+# 创建LLM服务实例（当前页面逻辑尚未直接使用，保留供后续调用）。
+# 注意：未配置对应 provider 的 API Key 时，langchain 客户端会在构造阶段直接抛异常。
+# 这里捕获异常并降级为 None，避免因为缺少 Key 导致整个站点无法启动。
+try:
+    llm_service = LLMServiceFactory.create(
+        provider=DEFAULT_PROVIDER,
+        # **DEFAULT_LLM_CONFIG
+    )
+except Exception as e:
+    llm_service = None
+    logger.warning(f"LLM 服务初始化失败，相关 AI 功能暂不可用（通常是未配置 API Key）: {e}")
 
 knowledge_service = get_knowledgeService_instance()
 
